@@ -7,8 +7,9 @@ import { useMatchmaking } from './game/network/Matchmaking';
 import { MultiplayerGame } from './game/network/MultiplayerGame';
 import { ModeLandingPage, HowToPlayPage } from './components/SEOPages';
 import { FAQPage, AboutPage, TipsPage, MultiplayerInfoPage } from './components/MoreSEOPages';
+import { MechanicsPage, StreakGuidePage, MobileGuidePage, ControlsPage } from './components/ExtendedSEOPages';
 
-type Route = 'home' | 'game' | 'auth' | 'mode-easy' | 'mode-medium' | 'mode-hard' | 'mode-nightmare' | 'how-to-play' | 'multiplayer' | 'faq' | 'about' | 'tips';
+type Route = 'home' | 'game' | 'auth' | 'mode-easy' | 'mode-medium' | 'mode-hard' | 'mode-nightmare' | 'how-to-play' | 'multiplayer' | 'faq' | 'about' | 'tips' | 'mechanics' | 'streak-guide' | 'mobile' | 'controls';
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -29,6 +30,10 @@ function App() {
     else if (path.startsWith('/faq')) setRoute('faq');
     else if (path.startsWith('/about')) setRoute('about');
     else if (path.startsWith('/tips')) setRoute('tips');
+    else if (path.startsWith('/mechanics')) setRoute('mechanics');
+    else if (path.startsWith('/streak-guide')) setRoute('streak-guide');
+    else if (path.startsWith('/mobile')) setRoute('mobile');
+    else if (path.startsWith('/controls')) setRoute('controls');
     else setRoute('home');
   }, []);
 
@@ -46,7 +51,11 @@ function App() {
       'multiplayer': '/multiplayer',
       'faq': '/faq',
       'about': '/about',
-      'tips': '/tips'
+      'tips': '/tips',
+      'mechanics': '/mechanics',
+      'streak-guide': '/streak-guide',
+      'mobile': '/mobile',
+      'controls': '/controls'
     };
     window.history.pushState({}, '', pathMap[newRoute]);
     setRoute(newRoute);
@@ -116,6 +125,10 @@ function App() {
   if (route === 'about') return <AboutPage onBack={() => navigateTo('home')} onPlay={startGame} />;
   if (route === 'tips') return <TipsPage onBack={() => navigateTo('home')} onPlay={startGame} />;
   if (route === 'multiplayer') return <MultiplayerInfoPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'mechanics') return <MechanicsPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'streak-guide') return <StreakGuidePage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'mobile') return <MobileGuidePage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'controls') return <ControlsPage onBack={() => navigateTo('home')} onPlay={startGame} />;
 
   // Main Menu (Home)
   return (

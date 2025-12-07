@@ -156,15 +156,15 @@ export const useGameLoop = (
             ballBottom > paddleY &&
             ballTop < paddleY + paddle.height
         ) {
-            // STREAK SYSTEM: consecutive hits = bigger speed boost!
+            // STREAK SYSTEM: Each paddle hit = +0.1x speed boost (cumulative!)
             streakRef.current += 1;
             setStreak(streakRef.current);
 
-            const streakBonus = Math.min(streakRef.current * 0.03, 0.15); // Max 15% extra from streak
-            const speedMultiplier = 1.10 + streakBonus; // 1.10 base + up to 0.15 from streak
+            // Each hit: 1.0 + (streak * 0.1) = 1st hit 1.1x, 2nd hit 1.2x, 3rd hit 1.3x...
+            const speedMultiplier = 1.0 + (streakRef.current * 0.1);
 
-            triggerShake(6 + Math.min(streakRef.current, 5));
-            emitParticles(ball.x, ball.y, ball.team === 'day' ? COLORS.dayAccent : COLORS.nightAccent, 10 + streakRef.current * 2);
+            triggerShake(6 + Math.min(streakRef.current * 2, 10));
+            emitParticles(ball.x, ball.y, ball.team === 'day' ? COLORS.dayAccent : COLORS.nightAccent, 10 + streakRef.current * 3);
 
             ball.vy = bounceDirection * Math.abs(ball.vy) * speedMultiplier;
             const hitPoint = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);

@@ -83,18 +83,11 @@ export const GameCanvas = ({ difficulty, onBack, userId }: GameCanvasProps) => {
             )}
 
             {/* Timer Display */}
-            <div className="flex items-center gap-4 mb-2 sm:mb-3">
-                <div
-                    className="text-3xl sm:text-5xl font-black font-mono tracking-wider transition-colors duration-300"
-                    style={{ color: getTimerColor() }}
-                >
-                    ⏱️ {formatTime(timeRemaining)}
-                </div>
-                {streak > 0 && (
-                    <div className="bg-gradient-to-r from-orange-500 to-red-500 px-3 py-1 rounded-full text-white font-bold text-sm sm:text-base animate-pulse">
-                        🔥 {streak}x Streak
-                    </div>
-                )}
+            <div
+                className="text-3xl sm:text-5xl font-black font-mono tracking-wider transition-colors duration-300 mb-2 sm:mb-3"
+                style={{ color: getTimerColor() }}
+            >
+                ⏱️ {formatTime(timeRemaining)}
             </div>
 
             {/* Score Bar */}
@@ -121,6 +114,19 @@ export const GameCanvas = ({ difficulty, onBack, userId }: GameCanvasProps) => {
                     onTouchMove={handleTouchMove}
                     onTouchStart={(e) => e.preventDefault()}
                 />
+
+                {/* Streak Indicator - Top-left corner (doesn't block gameplay) */}
+                {streak > 0 && !gameOver && (
+                    <div
+                        className="absolute top-3 left-3 px-3 py-1 rounded-lg text-white font-bold text-xs pointer-events-none transition-all duration-150"
+                        style={{
+                            background: `rgba(255, ${Math.max(100 - streak * 20, 0)}, 0, ${0.6 + Math.min(streak * 0.05, 0.3)})`,
+                            textShadow: '0 0 8px rgba(255, 100, 0, 0.6)'
+                        }}
+                    >
+                        🔥 {streak}x
+                    </div>
+                )}
 
                 {/* Pause Overlay */}
                 {isPaused && !gameOver && (
