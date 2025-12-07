@@ -6,8 +6,9 @@ import { GameCanvas } from './game/GameCanvas';
 import { useMatchmaking } from './game/network/Matchmaking';
 import { MultiplayerGame } from './game/network/MultiplayerGame';
 import { ModeLandingPage, HowToPlayPage } from './components/SEOPages';
+import { FAQPage, AboutPage, TipsPage, MultiplayerInfoPage } from './components/MoreSEOPages';
 
-type Route = 'home' | 'game' | 'auth' | 'mode-easy' | 'mode-medium' | 'mode-hard' | 'mode-nightmare' | 'how-to-play' | 'multiplayer';
+type Route = 'home' | 'game' | 'auth' | 'mode-easy' | 'mode-medium' | 'mode-hard' | 'mode-nightmare' | 'how-to-play' | 'multiplayer' | 'faq' | 'about' | 'tips';
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -25,10 +26,13 @@ function App() {
     else if (path.startsWith('/mode/nightmare')) setRoute('mode-nightmare');
     else if (path.startsWith('/how-to-play')) setRoute('how-to-play');
     else if (path.startsWith('/multiplayer')) setRoute('multiplayer');
+    else if (path.startsWith('/faq')) setRoute('faq');
+    else if (path.startsWith('/about')) setRoute('about');
+    else if (path.startsWith('/tips')) setRoute('tips');
     else setRoute('home');
   }, []);
 
-  // Update URL when route changes (for programmatic SEO)
+  // Update URL when route changes
   const navigateTo = (newRoute: Route) => {
     const pathMap: Record<Route, string> = {
       'home': '/',
@@ -39,7 +43,10 @@ function App() {
       'mode-hard': '/mode/hard',
       'mode-nightmare': '/mode/nightmare',
       'how-to-play': '/how-to-play',
-      'multiplayer': '/multiplayer'
+      'multiplayer': '/multiplayer',
+      'faq': '/faq',
+      'about': '/about',
+      'tips': '/tips'
     };
     window.history.pushState({}, '', pathMap[newRoute]);
     setRoute(newRoute);
@@ -89,10 +96,7 @@ function App() {
   if (route === 'auth') {
     return (
       <div className="relative">
-        <button
-          onClick={() => navigateTo('home')}
-          className="fixed top-4 left-4 text-white z-50"
-        >
+        <button onClick={() => navigateTo('home')} className="fixed top-4 left-4 text-white z-50">
           ← Back
         </button>
         <Auth />
@@ -101,23 +105,17 @@ function App() {
   }
 
   // SEO Mode Landing Pages
-  if (route === 'mode-easy') {
-    return <ModeLandingPage mode="EASY" onPlay={() => startGame('EASY')} onBack={() => navigateTo('home')} />;
-  }
-  if (route === 'mode-medium') {
-    return <ModeLandingPage mode="MEDIUM" onPlay={() => startGame('MEDIUM')} onBack={() => navigateTo('home')} />;
-  }
-  if (route === 'mode-hard') {
-    return <ModeLandingPage mode="HARD" onPlay={() => startGame('HARD')} onBack={() => navigateTo('home')} />;
-  }
-  if (route === 'mode-nightmare') {
-    return <ModeLandingPage mode="NIGHTMARE" onPlay={() => startGame('NIGHTMARE')} onBack={() => navigateTo('home')} />;
-  }
+  if (route === 'mode-easy') return <ModeLandingPage mode="EASY" onPlay={() => startGame('EASY')} onBack={() => navigateTo('home')} />;
+  if (route === 'mode-medium') return <ModeLandingPage mode="MEDIUM" onPlay={() => startGame('MEDIUM')} onBack={() => navigateTo('home')} />;
+  if (route === 'mode-hard') return <ModeLandingPage mode="HARD" onPlay={() => startGame('HARD')} onBack={() => navigateTo('home')} />;
+  if (route === 'mode-nightmare') return <ModeLandingPage mode="NIGHTMARE" onPlay={() => startGame('NIGHTMARE')} onBack={() => navigateTo('home')} />;
 
-  // How to Play Page
-  if (route === 'how-to-play') {
-    return <HowToPlayPage onBack={() => navigateTo('home')} onPlay={startGame} />;
-  }
+  // Info Pages
+  if (route === 'how-to-play') return <HowToPlayPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'faq') return <FAQPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'about') return <AboutPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'tips') return <TipsPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'multiplayer') return <MultiplayerInfoPage onBack={() => navigateTo('home')} onPlay={startGame} />;
 
   // Main Menu (Home)
   return (
