@@ -8,8 +8,9 @@ import { MultiplayerGame } from './game/network/MultiplayerGame';
 import { ModeLandingPage, HowToPlayPage } from './components/SEOPages';
 import { FAQPage, AboutPage, TipsPage, MultiplayerInfoPage } from './components/MoreSEOPages';
 import { MechanicsPage, StreakGuidePage, MobileGuidePage, ControlsPage } from './components/ExtendedSEOPages';
+import { PongHistoryPage, ChallengePage, HighScorePage, BrowserCompatPage, UpdatesPage, VsOtherGamesPage } from './components/AdditionalSEOPages';
 
-type Route = 'home' | 'game' | 'auth' | 'mode-easy' | 'mode-medium' | 'mode-hard' | 'mode-nightmare' | 'how-to-play' | 'multiplayer' | 'faq' | 'about' | 'tips' | 'mechanics' | 'streak-guide' | 'mobile' | 'controls';
+type Route = 'home' | 'game' | 'auth' | 'mode-easy' | 'mode-medium' | 'mode-hard' | 'mode-nightmare' | 'how-to-play' | 'multiplayer' | 'faq' | 'about' | 'tips' | 'mechanics' | 'streak-guide' | 'mobile' | 'controls' | 'history' | 'challenge' | 'high-score' | 'browsers' | 'updates' | 'compare';
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -34,6 +35,12 @@ function App() {
     else if (path.startsWith('/streak-guide')) setRoute('streak-guide');
     else if (path.startsWith('/mobile')) setRoute('mobile');
     else if (path.startsWith('/controls')) setRoute('controls');
+    else if (path.startsWith('/history')) setRoute('history');
+    else if (path.startsWith('/challenge')) setRoute('challenge');
+    else if (path.startsWith('/high-score')) setRoute('high-score');
+    else if (path.startsWith('/browsers')) setRoute('browsers');
+    else if (path.startsWith('/updates')) setRoute('updates');
+    else if (path.startsWith('/compare')) setRoute('compare');
     else setRoute('home');
   }, []);
 
@@ -55,7 +62,13 @@ function App() {
       'mechanics': '/mechanics',
       'streak-guide': '/streak-guide',
       'mobile': '/mobile',
-      'controls': '/controls'
+      'controls': '/controls',
+      'history': '/history',
+      'challenge': '/challenge',
+      'high-score': '/high-score',
+      'browsers': '/browsers',
+      'updates': '/updates',
+      'compare': '/compare'
     };
     window.history.pushState({}, '', pathMap[newRoute]);
     setRoute(newRoute);
@@ -129,6 +142,14 @@ function App() {
   if (route === 'streak-guide') return <StreakGuidePage onBack={() => navigateTo('home')} onPlay={startGame} />;
   if (route === 'mobile') return <MobileGuidePage onBack={() => navigateTo('home')} onPlay={startGame} />;
   if (route === 'controls') return <ControlsPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+
+  // Additional SEO Pages
+  if (route === 'history') return <PongHistoryPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'challenge') return <ChallengePage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'high-score') return <HighScorePage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'browsers') return <BrowserCompatPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'updates') return <UpdatesPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'compare') return <VsOtherGamesPage onBack={() => navigateTo('home')} onPlay={startGame} />;
 
   // Main Menu (Home)
   return (
