@@ -9,8 +9,9 @@ import { ModeLandingPage, HowToPlayPage } from './components/SEOPages';
 import { FAQPage, AboutPage, TipsPage, MultiplayerInfoPage } from './components/MoreSEOPages';
 import { MechanicsPage, StreakGuidePage, MobileGuidePage, ControlsPage } from './components/ExtendedSEOPages';
 import { PongHistoryPage, ChallengePage, HighScorePage, BrowserCompatPage, UpdatesPage, VsOtherGamesPage } from './components/AdditionalSEOPages';
+import { UnblockedPage, WorkBreakPage, ReactionTimePage, OfflinePage, ArcadePage, AccessibilityPage } from './components/TargetedSEOPages';
 
-type Route = 'home' | 'game' | 'auth' | 'mode-easy' | 'mode-medium' | 'mode-hard' | 'mode-nightmare' | 'how-to-play' | 'multiplayer' | 'faq' | 'about' | 'tips' | 'mechanics' | 'streak-guide' | 'mobile' | 'controls' | 'history' | 'challenge' | 'high-score' | 'browsers' | 'updates' | 'compare';
+type Route = 'home' | 'game' | 'auth' | 'mode-easy' | 'mode-medium' | 'mode-hard' | 'mode-nightmare' | 'how-to-play' | 'multiplayer' | 'faq' | 'about' | 'tips' | 'mechanics' | 'streak-guide' | 'mobile' | 'controls' | 'history' | 'challenge' | 'high-score' | 'browsers' | 'updates' | 'compare' | 'unblocked' | 'work-break' | 'reaction-time' | 'offline' | 'arcade' | 'accessibility';
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -41,6 +42,12 @@ function App() {
     else if (path.startsWith('/browsers')) setRoute('browsers');
     else if (path.startsWith('/updates')) setRoute('updates');
     else if (path.startsWith('/compare')) setRoute('compare');
+    else if (path.startsWith('/unblocked')) setRoute('unblocked');
+    else if (path.startsWith('/work-break')) setRoute('work-break');
+    else if (path.startsWith('/reaction-time')) setRoute('reaction-time');
+    else if (path.startsWith('/offline')) setRoute('offline');
+    else if (path.startsWith('/arcade')) setRoute('arcade');
+    else if (path.startsWith('/accessibility')) setRoute('accessibility');
     else setRoute('home');
   }, []);
 
@@ -68,7 +75,13 @@ function App() {
       'high-score': '/high-score',
       'browsers': '/browsers',
       'updates': '/updates',
-      'compare': '/compare'
+      'compare': '/compare',
+      'unblocked': '/unblocked',
+      'work-break': '/work-break',
+      'reaction-time': '/reaction-time',
+      'offline': '/offline',
+      'arcade': '/arcade',
+      'accessibility': '/accessibility'
     };
     window.history.pushState({}, '', pathMap[newRoute]);
     setRoute(newRoute);
@@ -150,6 +163,14 @@ function App() {
   if (route === 'browsers') return <BrowserCompatPage onBack={() => navigateTo('home')} onPlay={startGame} />;
   if (route === 'updates') return <UpdatesPage onBack={() => navigateTo('home')} onPlay={startGame} />;
   if (route === 'compare') return <VsOtherGamesPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+
+  // Targeted SEO Pages
+  if (route === 'unblocked') return <UnblockedPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'work-break') return <WorkBreakPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'reaction-time') return <ReactionTimePage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'offline') return <OfflinePage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'arcade') return <ArcadePage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'accessibility') return <AccessibilityPage onBack={() => navigateTo('home')} onPlay={startGame} />;
 
   // Main Menu (Home)
   return (
