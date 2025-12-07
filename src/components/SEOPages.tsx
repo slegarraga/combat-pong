@@ -240,26 +240,26 @@ export const HowToPlayPage = ({ onBack, onPlay }: HowToPlayPageProps) => {
                 {/* Speed Mechanic */}
                 <article className="mb-6 sm:mb-10">
                     <h2 className="text-lg sm:text-2xl font-bold mb-3 text-pink-400 flex items-center gap-2">
-                        <span>⚡</span> Speed Mechanic
+                        <span>⚡</span> Streak Speed System
                     </h2>
                     <div className="bg-white/5 rounded-xl p-4 space-y-3">
                         <div className="flex items-start gap-3">
                             <span className="text-green-400 text-lg">🏓</span>
                             <div>
-                                <p className="font-bold text-sm">Paddle Hit = Speed Boost!</p>
-                                <p className="text-gray-400 text-xs">Hit the ball with your paddle and it speeds up 15%</p>
+                                <p className="font-bold text-sm">Paddle Hit = +0.25x Speed!</p>
+                                <p className="text-gray-400 text-xs">Each consecutive hit boosts speed: 1.25x → 1.5x → 1.75x → 2.0x and beyond!</p>
                             </div>
                         </div>
                         <div className="flex items-start gap-3">
                             <span className="text-red-400 text-lg">💥</span>
                             <div>
-                                <p className="font-bold text-sm">Wall Miss = Speed Penalty</p>
-                                <p className="text-gray-400 text-xs">Miss the ball and it slows down 15%</p>
+                                <p className="font-bold text-sm">Miss = 0.85x Penalty + Streak Reset!</p>
+                                <p className="text-gray-400 text-xs">Ball slows to 0.85x speed and your streak resets to 0</p>
                             </div>
                         </div>
                     </div>
                     <p className="text-gray-500 text-xs mt-3">
-                        💡 Faster balls conquer more territory. Keep hitting them!
+                        💡 Higher streaks = faster balls + wilder bounce angles. Keep hitting!
                     </p>
                 </article>
 
