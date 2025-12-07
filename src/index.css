@@ -2,15 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
-html,
+html {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
+  background: #1a1a2e;
+  color: white;
+}
+
 body {
   margin: 0;
   padding: 0;
   width: 100%;
-  height: 100%;
-  overflow: hidden;
+  min-height: 100%;
   background: #1a1a2e;
   color: white;
+  overflow-x: hidden;
+  /* Only prevent horizontal scroll */
+  overflow-y: auto;
+  /* Allow vertical scroll */
+}
+
+/* Game-specific: prevent scroll only during gameplay */
+.game-active {
+  overflow: hidden !important;
+  position: fixed;
+  width: 100%;
+  height: 100%;
 }
 
 /* Mesh Gradient Button */
@@ -31,14 +50,9 @@ body {
 .btn-gradient {
   background: linear-gradient(135deg,
       #7b2cbf 0%,
-      /* Purple */
       #3a86ff 35%,
-      /* Blue */
       #ff006e 65%,
-      /* Pink */
-      #7b2cbf 100%
-      /* Purple */
-    );
+      #7b2cbf 100%);
   background-size: 300% 300%;
   animation: mesh-shift 6s ease infinite;
   transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
