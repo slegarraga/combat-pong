@@ -10,8 +10,9 @@ import { FAQPage, AboutPage, TipsPage, MultiplayerInfoPage } from './components/
 import { MechanicsPage, StreakGuidePage, MobileGuidePage, ControlsPage } from './components/ExtendedSEOPages';
 import { PongHistoryPage, ChallengePage, HighScorePage, BrowserCompatPage, UpdatesPage, VsOtherGamesPage } from './components/AdditionalSEOPages';
 import { UnblockedPage, WorkBreakPage, ReactionTimePage, OfflinePage, ArcadePage, AccessibilityPage } from './components/TargetedSEOPages';
+import { KidsPage, TwoPlayerPage, BestFreeGamesPage, NoDownloadPage, RelaxingPage, FocusPage } from './components/MoreTargetedSEOPages';
 
-type Route = 'home' | 'game' | 'auth' | 'mode-easy' | 'mode-medium' | 'mode-hard' | 'mode-nightmare' | 'how-to-play' | 'multiplayer' | 'faq' | 'about' | 'tips' | 'mechanics' | 'streak-guide' | 'mobile' | 'controls' | 'history' | 'challenge' | 'high-score' | 'browsers' | 'updates' | 'compare' | 'unblocked' | 'work-break' | 'reaction-time' | 'offline' | 'arcade' | 'accessibility';
+type Route = 'home' | 'game' | 'auth' | 'mode-easy' | 'mode-medium' | 'mode-hard' | 'mode-nightmare' | 'how-to-play' | 'multiplayer' | 'faq' | 'about' | 'tips' | 'mechanics' | 'streak-guide' | 'mobile' | 'controls' | 'history' | 'challenge' | 'high-score' | 'browsers' | 'updates' | 'compare' | 'unblocked' | 'work-break' | 'reaction-time' | 'offline' | 'arcade' | 'accessibility' | 'kids' | 'two-player' | 'best-free' | 'no-download' | 'relaxing' | 'focus';
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -48,6 +49,12 @@ function App() {
     else if (path.startsWith('/offline')) setRoute('offline');
     else if (path.startsWith('/arcade')) setRoute('arcade');
     else if (path.startsWith('/accessibility')) setRoute('accessibility');
+    else if (path.startsWith('/kids')) setRoute('kids');
+    else if (path.startsWith('/two-player')) setRoute('two-player');
+    else if (path.startsWith('/best-free')) setRoute('best-free');
+    else if (path.startsWith('/no-download')) setRoute('no-download');
+    else if (path.startsWith('/relaxing')) setRoute('relaxing');
+    else if (path.startsWith('/focus')) setRoute('focus');
     else setRoute('home');
   }, []);
 
@@ -81,7 +88,13 @@ function App() {
       'reaction-time': '/reaction-time',
       'offline': '/offline',
       'arcade': '/arcade',
-      'accessibility': '/accessibility'
+      'accessibility': '/accessibility',
+      'kids': '/kids',
+      'two-player': '/two-player',
+      'best-free': '/best-free',
+      'no-download': '/no-download',
+      'relaxing': '/relaxing',
+      'focus': '/focus'
     };
     window.history.pushState({}, '', pathMap[newRoute]);
     setRoute(newRoute);
@@ -171,6 +184,14 @@ function App() {
   if (route === 'offline') return <OfflinePage onBack={() => navigateTo('home')} onPlay={startGame} />;
   if (route === 'arcade') return <ArcadePage onBack={() => navigateTo('home')} onPlay={startGame} />;
   if (route === 'accessibility') return <AccessibilityPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+
+  // More Targeted SEO Pages
+  if (route === 'kids') return <KidsPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'two-player') return <TwoPlayerPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'best-free') return <BestFreeGamesPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'no-download') return <NoDownloadPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'relaxing') return <RelaxingPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'focus') return <FocusPage onBack={() => navigateTo('home')} onPlay={startGame} />;
 
   // Main Menu (Home)
   return (
