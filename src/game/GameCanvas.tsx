@@ -127,10 +127,16 @@ export const GameCanvas = ({ difficulty, onBack, userId }: GameCanvasProps) => {
                 {gameOver && (
                     <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center rounded-lg sm:rounded-xl">
                         <div className="text-center text-white px-4">
-                            <p className="text-3xl sm:text-4xl font-black mb-2" style={{ color: dayPercent >= 50 ? '#22c55e' : COLORS.heart }}>
-                                {dayPercent >= 50 ? 'VICTORY!' : 'GAME OVER'}
+                            <p className="text-3xl sm:text-4xl font-black mb-2" style={{ color: COLORS.heart }}>
+                                GAME OVER
                             </p>
-                            <p className="text-gray-400 text-sm mb-2">You controlled {dayPercent}%</p>
+                            <p className="text-lg sm:text-xl font-bold mb-1" style={{ color: dayPercent >= 50 ? '#22c55e' : COLORS.nightBall }}>
+                                {dayPercent >= 50 ? '🏆 You won!' : '😢 Night wins'}
+                            </p>
+                            <p className="text-gray-400 text-sm mb-2">You controlled {dayPercent}% territory</p>
+                            <p className="text-gray-500 text-xs mb-4">
+                                (≥50% = Victory)
+                            </p>
 
                             {/* Stats Display */}
                             {stats && (
