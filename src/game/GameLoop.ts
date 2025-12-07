@@ -170,9 +170,11 @@ export const useGameLoop = (
             const hitPoint = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
             ball.vx += hitPoint * 4;
 
+            // Allow streak to push beyond normal max speed! Cap scales with streak
+            const streakMaxSpeed = MAX_SPEED * diffSettings.speedMod * speedMultiplier;
             const speed = Math.sqrt(ball.vx ** 2 + ball.vy ** 2);
-            if (speed > MAX_SPEED * diffSettings.speedMod) {
-                const scale = (MAX_SPEED * diffSettings.speedMod) / speed;
+            if (speed > streakMaxSpeed) {
+                const scale = streakMaxSpeed / speed;
                 ball.vx *= scale;
                 ball.vy *= scale;
             }
