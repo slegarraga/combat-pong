@@ -34,7 +34,7 @@ export const MechanicsPage = ({ onBack, onPlay }: SEOPageProps) => {
     useEffect(() => {
         document.title = 'Combat Pong Game Mechanics - Speed System, Territory & Streaks Explained';
         const metaDesc = document.querySelector('meta[name="description"]');
-        if (metaDesc) metaDesc.setAttribute('content', 'Deep dive into Combat Pong mechanics: 90-second timer, streak speed system, territory conquest, paddle physics. Master the game with complete understanding!');
+        if (metaDesc) metaDesc.setAttribute('content', 'Deep dive into Combat Pong mechanics: 90-second timer, streak speed system (+0.25x per hit!), dynamic bounce angles, territory conquest. Master the game!');
         return () => { document.title = 'Combat Pong - Free Online Territory Control Game'; };
     }, []);
 
@@ -71,32 +71,31 @@ export const MechanicsPage = ({ onBack, onPlay }: SEOPageProps) => {
                     </div>
                 </article>
 
-                {/* Streak System */}
                 <article className="mb-6 sm:mb-10">
                     <h2 className="text-xl font-bold mb-3 text-orange-400 flex items-center gap-2">🔥 Streak Speed System</h2>
                     <div className="bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-xl p-4 sm:p-6 space-y-4 text-gray-300 text-sm sm:text-base">
-                        <p>The <span className="text-orange-400 font-bold">Streak System</span> is the key to winning. Each consecutive paddle hit increases your ball's speed:</p>
+                        <p>The <span className="text-orange-400 font-bold">Streak System</span> is the key to winning. Each consecutive paddle hit increases your ball's speed by <span className="text-green-400 font-bold">+0.25x</span>:</p>
 
                         <div className="space-y-2">
                             <div className="flex justify-between items-center bg-black/30 rounded-lg px-3 py-2">
                                 <span>1st hit</span>
-                                <span className="text-green-400 font-bold">1.1x speed</span>
+                                <span className="text-green-400 font-bold">1.25x speed</span>
                             </div>
                             <div className="flex justify-between items-center bg-black/30 rounded-lg px-3 py-2">
                                 <span>2nd hit</span>
-                                <span className="text-green-400 font-bold">1.2x speed</span>
+                                <span className="text-green-400 font-bold">1.50x speed</span>
                             </div>
                             <div className="flex justify-between items-center bg-black/30 rounded-lg px-3 py-2">
                                 <span>3rd hit</span>
-                                <span className="text-green-400 font-bold">1.3x speed</span>
+                                <span className="text-green-400 font-bold">1.75x speed</span>
                             </div>
                             <div className="flex justify-between items-center bg-black/30 rounded-lg px-3 py-2">
-                                <span>5th hit</span>
-                                <span className="text-green-400 font-bold">1.5x speed</span>
-                            </div>
-                            <div className="flex justify-between items-center bg-black/30 rounded-lg px-3 py-2">
-                                <span>10th hit</span>
+                                <span>4th hit</span>
                                 <span className="text-green-400 font-bold">2.0x speed (double!)</span>
+                            </div>
+                            <div className="flex justify-between items-center bg-black/30 rounded-lg px-3 py-2">
+                                <span>8th hit</span>
+                                <span className="text-green-400 font-bold">3.0x speed (triple!)</span>
                             </div>
                         </div>
 
@@ -104,7 +103,7 @@ export const MechanicsPage = ({ onBack, onPlay }: SEOPageProps) => {
                         <ul className="list-disc list-inside">
                             <li>Ball speed drops to <span className="text-red-400">0.85x</span></li>
                             <li>Streak resets to <span className="text-red-400">0</span></li>
-                            <li>You lose all momentum!</li>
+                            <li>Speed multiplier resets - you lose all momentum!</li>
                         </ul>
                     </div>
                 </article>
@@ -134,15 +133,16 @@ export const MechanicsPage = ({ onBack, onPlay }: SEOPageProps) => {
 
                 {/* Paddle Physics */}
                 <article className="mb-6 sm:mb-10">
-                    <h2 className="text-xl font-bold mb-3 text-pink-400 flex items-center gap-2">🏓 Paddle Physics</h2>
+                    <h2 className="text-xl font-bold mb-3 text-pink-400 flex items-center gap-2">🏓 Dynamic Paddle Physics</h2>
                     <div className="bg-white/5 rounded-xl p-4 sm:p-6 space-y-3 text-gray-300 text-sm sm:text-base">
-                        <p>Where you hit the ball on your paddle affects its trajectory:</p>
+                        <p>Bounce angles are <span className="text-pink-400 font-bold">dynamic and unpredictable</span> - affected by multiple factors:</p>
                         <ul className="list-disc list-inside space-y-1">
-                            <li><strong>Center hit:</strong> Ball bounces straight up</li>
-                            <li><strong>Left edge:</strong> Ball angles left</li>
-                            <li><strong>Right edge:</strong> Ball angles right</li>
+                            <li><strong>Paddle position:</strong> Edge hits = sharp angles, center = straighter</li>
+                            <li><strong>Random spin:</strong> Each hit has slight random variation</li>
+                            <li><strong>Velocity influence:</strong> Current ball momentum affects the angle</li>
+                            <li><strong>Streak bonus:</strong> Higher streaks = wilder deflections!</li>
                         </ul>
-                        <p className="text-gray-500 text-sm mt-2">Use this to aim your balls toward enemy territory!</p>
+                        <p className="text-gray-500 text-sm mt-2">This makes the game less predictable and more exciting as your streak builds!</p>
                     </div>
                 </article>
 
@@ -161,7 +161,7 @@ export const StreakGuidePage = ({ onBack, onPlay }: SEOPageProps) => {
     useEffect(() => {
         document.title = 'Combat Pong Streak Guide - Master the Speed System | Pro Strategy';
         const metaDesc = document.querySelector('meta[name="description"]');
-        if (metaDesc) metaDesc.setAttribute('content', 'Master the Combat Pong streak system! Learn how consecutive paddle hits boost speed by 0.1x each. Pro strategies for maintaining streaks and dominating territory.');
+        if (metaDesc) metaDesc.setAttribute('content', 'Master the Combat Pong streak system! Learn how consecutive paddle hits boost speed by +0.25x each (1st=1.25x, 2nd=1.5x...). Pro strategies for dominating territory.');
         return () => { document.title = 'Combat Pong - Free Online Territory Control Game'; };
     }, []);
 
@@ -187,46 +187,44 @@ export const StreakGuidePage = ({ onBack, onPlay }: SEOPageProps) => {
                     </p>
                 </div>
 
-                {/* What is Streak */}
                 <article className="mb-6 sm:mb-10">
                     <h2 className="text-xl font-bold mb-3">What is the Streak System?</h2>
                     <p className="text-gray-300 text-sm sm:text-base leading-relaxed mb-4">
                         The Streak System rewards consistent paddle hits. Each consecutive time you hit a ball with your paddle,
-                        it gains <span className="text-orange-400 font-bold">+0.1x speed</span>. This compounds: 1.1x → 1.2x → 1.3x → and beyond!
+                        it gains <span className="text-orange-400 font-bold">+0.25x speed</span>. This compounds quickly: 1.25x → 1.5x → 1.75x → 2.0x and beyond!
                     </p>
                     <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4">
                         <p className="text-orange-400 font-bold text-center text-lg">
-                            Speed = 1.0 + (Streak × 0.1)
+                            Speed = 1.0 + (Streak × 0.25)
                         </p>
                     </div>
                 </article>
 
-                {/* Speed Table */}
                 <article className="mb-6 sm:mb-10">
                     <h2 className="text-xl font-bold mb-3">Streak Speed Multipliers</h2>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
                             <div key={n} className="bg-white/5 rounded-lg p-3 text-center">
                                 <div className="text-orange-400 font-bold">{n}x Streak</div>
-                                <div className="text-green-400 text-lg font-black">{(1 + n * 0.1).toFixed(1)}x</div>
+                                <div className="text-green-400 text-lg font-black">{(1 + n * 0.25).toFixed(2)}x</div>
                             </div>
                         ))}
                     </div>
+                    <p className="text-gray-500 text-xs mt-3 text-center">Speed boost persists on the ball until you miss!</p>
                 </article>
 
-                {/* The Penalty */}
                 <article className="mb-6 sm:mb-10">
                     <h2 className="text-xl font-bold mb-3 text-red-400">⚠️ The Miss Penalty</h2>
                     <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 sm:p-6 space-y-3 text-gray-300 text-sm sm:text-base">
                         <p>When your ball hits the bottom wall (you missed it):</p>
                         <ul className="list-disc list-inside space-y-2">
                             <li>Ball speed multiplied by <span className="text-red-400 font-bold">0.85x</span> (slows down)</li>
-                            <li>Your streak resets to <span className="text-red-400 font-bold">0</span></li>
-                            <li>All momentum is lost</li>
+                            <li>Ball's speed multiplier resets to <span className="text-red-400 font-bold">1.0x</span></li>
+                            <li>Your streak counter resets to <span className="text-red-400 font-bold">0</span></li>
                             <li>Red particles burst as a warning</li>
                         </ul>
                         <p className="text-gray-500 text-sm mt-3">
-                            A 5-streak at 1.5x speed becomes just 0.85x after a miss - that's a 77% speed loss!
+                            A 4-streak ball at 2.0x speed drops to just 0.85x after a miss - that's a 57% speed loss!
                         </p>
                     </div>
                 </article>

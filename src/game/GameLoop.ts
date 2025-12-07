@@ -107,14 +107,16 @@ export const useGameLoop = (
                 y: CANVAS_SIZE * 0.75 + (Math.random() - 0.5) * 50,
                 vx: speed * (Math.random() > 0.5 ? 1 : -1),
                 vy: -speed,
-                team: 'day'
+                team: 'day',
+                speedMultiplier: 1.0
             });
             balls.push({
                 x: CANVAS_SIZE / 4 + Math.random() * (CANVAS_SIZE / 2),
                 y: CANVAS_SIZE * 0.25 + (Math.random() - 0.5) * 50,
                 vx: speed * (Math.random() > 0.5 ? 1 : -1),
                 vy: speed,
-                team: 'night'
+                team: 'night',
+                speedMultiplier: 1.0
             });
         }
         return balls;
@@ -161,17 +163,23 @@ export const useGameLoop = (
             setStreak(streakRef.current);
 
             // Each hit: 1.0 + (streak * 0.25) = 1st hit 1.25x, 2nd hit 1.5x, 3rd hit 1.75x...
-            const speedMultiplier = 1.0 + (streakRef.current * 0.25);
+            const newSpeedMultiplier = 1.0 + (streakRef.current * 0.25);
+            ball.speedMultiplier = newSpeedMultiplier; // Persist on the ball!
 
             triggerShake(6 + Math.min(streakRef.current * 2, 10));
             emitParticles(ball.x, ball.y, ball.team === 'day' ? COLORS.dayAccent : COLORS.nightAccent, 10 + streakRef.current * 3);
 
-            ball.vy = bounceDirection * Math.abs(ball.vy) * speedMultiplier;
+            // DYNAMIC DIRECTION: More unpredictable bounce angles!
             const hitPoint = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
-            ball.vx += hitPoint * 4;
+            const randomSpin = (Math.random() - 0.5) * 3; // Random spin effect
+            const velocityInfluence = ball.vx * 0.15; // Current velocity affects angle
+            const maxAngleDeflection = 8 + streakRef.current; // Higher streak = wilder deflections
+
+            ball.vx += hitPoint * maxAngleDeflection + randomSpin + velocityInfluence;
+            ball.vy = bounceDirection * Math.abs(ball.vy) * newSpeedMultiplier;
 
             // Allow streak to push beyond normal max speed! Cap scales with streak
-            const streakMaxSpeed = MAX_SPEED * diffSettings.speedMod * speedMultiplier;
+            const streakMaxSpeed = MAX_SPEED * diffSettings.speedMod * newSpeedMultiplier;
             const speed = Math.sqrt(ball.vx ** 2 + ball.vy ** 2);
             if (speed > streakMaxSpeed) {
                 const scale = streakMaxSpeed / speed;
@@ -223,11 +231,20 @@ export const useGameLoop = (
             triggerShake(2);
         }
 
-        // TOP wall - bounce
+        // TOP wall - AI MISSED! Night balls get penalty too (fair play!)
         if (ball.y < BALL_RADIUS) {
+            if (ball.team === 'night') {
+                // Night ball = AI's ball, AI missed it! Reset their speed too!
+                ball.speedMultiplier = 1.0; // Reset speed multiplier on miss!
+                ball.vx *= 0.85;
+                ball.vy *= 0.85;
+                triggerShake(4);
+                emitParticles(ball.x, ball.y, '#3b82f6', 6); // Blue particles for AI miss
+            } else {
+                triggerShake(2);
+            }
             ball.vy = Math.abs(ball.vy);
             ball.y = BALL_RADIUS + 5;
-            triggerShake(2);
         }
 
         // BOTTOM wall - you MISSED! Ball slows down (0.85x penalty) + STREAK RESET!
@@ -236,6 +253,7 @@ export const useGameLoop = (
                 // Day ball = YOUR ball, you missed it! Streak resets!
                 streakRef.current = 0;
                 setStreak(0);
+                ball.speedMultiplier = 1.0; // Reset speed multiplier on miss!
                 ball.vx *= 0.85;
                 ball.vy *= 0.85;
                 triggerShake(8);
@@ -254,7 +272,9 @@ export const useGameLoop = (
         ball.vy += (Math.random() - 0.5) * accel * 0.5;
 
         const speed = Math.sqrt(ball.vx ** 2 + ball.vy ** 2);
-        const maxSpd = MAX_SPEED * diffSettings.speedMod;
+        // RESPECT the ball's streak multiplier! Don't cap streak-boosted balls!
+        const ballMultiplier = ball.speedMultiplier || 1.0;
+        const maxSpd = MAX_SPEED * diffSettings.speedMod * ballMultiplier;
         const minSpd = MIN_SPEED * diffSettings.speedMod;
 
         if (speed > maxSpd) {

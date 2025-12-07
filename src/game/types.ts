@@ -8,6 +8,7 @@ export interface Ball {
     vx: number;
     vy: number;
     team: Team;
+    speedMultiplier?: number; // Tracks streak-boosted speed
 }
 
 export interface Paddle {
