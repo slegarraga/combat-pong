@@ -16,15 +16,15 @@ export const FAQPage = ({ onBack, onPlay }: SEOPageProps) => {
     }, []);
 
     const faqs = [
-        { q: 'What is Combat Pong?', a: 'Combat Pong is a free browser-based territory control game inspired by classic Pong. You control a paddle to protect your balls and conquer territory by painting the board.' },
+        { q: 'What is Combat Pong?', a: 'Combat Pong is a free browser-based territory control game inspired by classic Pong. You have 90 seconds to conquer as much territory as possible by controlling your paddle and hitting balls.' },
         { q: 'Is Combat Pong free to play?', a: 'Yes! Combat Pong is 100% free with no ads, no in-app purchases, and no download required. Just open your browser and start playing instantly.' },
+        { q: 'How do I win a match?', a: 'Each match lasts 90 seconds. When time runs out, whoever controls more than 50% of the territory wins! Hit balls with your paddle to speed them up and conquer faster.' },
+        { q: 'How does the streak system work?', a: 'Consecutive paddle hits build a streak! Each hit speeds up your ball (1.10x base + 0.03x per streak). Miss and hit the wall? Your ball slows down (0.85x) and streak resets to 0.' },
         { q: 'Can I play on mobile?', a: 'Absolutely! Combat Pong is fully optimized for mobile devices with touch controls. Works on any smartphone or tablet browser - no app needed.' },
         { q: 'How do I play multiplayer?', a: 'Login with your Google account, click "Find Match" and you\'ll be paired with another player for real-time 1v1 battles. First to 90% territory wins!' },
-        { q: 'What are the difficulty levels?', a: 'There are 4 modes: Easy (2 slow balls), Medium (2 normal balls), Hard (4 fast balls), and Nightmare (6 very fast balls). All modes give you 3 lives.' },
-        { q: 'How does the lives system work?', a: 'You start with 3 lives (❤️❤️❤️). When your Day ball hits the bottom wall, you lose one life. At 0 lives, the game ends.' },
+        { q: 'What are the difficulty levels?', a: 'There are 4 modes: Easy (2 slow balls), Medium (2 normal balls), Hard (4 fast balls), and Nightmare (6 very fast balls). All are 90-second matches.' },
         { q: 'What browsers are supported?', a: 'Combat Pong works on all modern browsers: Chrome, Firefox, Safari, Edge, and their mobile versions. No plugins required.' },
         { q: 'How do I control the paddle?', a: 'On desktop, move your mouse left/right. On mobile, touch the screen and drag your finger. The paddle follows your input.' },
-        { q: 'Is there a leaderboard?', a: 'We\'re working on global leaderboards! For now, share your scores on social media and challenge your friends to beat your territory percentage.' },
         { q: 'Who created Combat Pong?', a: 'Combat Pong was inspired by the viral "Pong Wars" concept. We enhanced it with gameplay mechanics, multiplayer, and mobile optimization.' }
     ];
 
@@ -193,14 +193,14 @@ export const TipsPage = ({ onBack, onPlay }: SEOPageProps) => {
     }, []);
 
     const tips = [
-        { title: '🎯 Center Positioning', desc: 'Keep your paddle near the center when possible. This gives you maximum coverage and reaction time for balls coming from either direction.' },
+        { title: '🔥 Build Streak Combos', desc: 'Consecutive paddle hits build your streak! Each hit makes your ball faster (1.10x + 0.03x per streak). Never let the ball hit the wall or you lose all momentum.' },
+        { title: '🎯 Center Positioning', desc: 'Keep your paddle near the center when possible. This gives you maximum coverage and lets you catch more balls to build streaks.' },
         { title: '👀 Track Multiple Balls', desc: 'In Hard and Nightmare modes, don\'t focus on one ball. Use peripheral vision to track all balls and prioritize the most immediate threats.' },
-        { title: '⏱️ Anticipate Bounces', desc: 'Balls bounce predictably off walls and tiles. Watch the trajectory and predict where the ball will be, not where it is now.' },
-        { title: '🛡️ Defense First', desc: 'Territory conquest is tempting, but staying alive matters more. A dead player can\'t conquer anything. Protect your balls before chasing territory.' },
+        { title: '⏱️ Watch the Clock', desc: 'You have 90 seconds. If you\'re ahead at 50%, play defensively. If behind, take risks and hit more balls to speed them up!' },
+        { title: '🛡️ Avoid Wall Hits', desc: 'When your ball hits the bottom wall, it slows to 0.85x AND your streak resets. Faster balls conquer more territory, so keep hitting!' },
         { title: '🔄 Use the Paddle Angle', desc: 'Where the ball hits your paddle affects its bounce angle. Hit with the edge for sharp angles, center for straight returns.' },
         { title: '📊 Know Your Limits', desc: 'Start with Easy mode to learn mechanics. Jumping to Nightmare before mastering basics leads to frustration, not improvement.' },
-        { title: '🧘 Stay Calm', desc: 'Panic leads to overreaction. Take a breath, trust your reflexes, and make deliberate movements rather than frantic swipes.' },
-        { title: '💡 Learn from Losses', desc: 'Watch how you lost. Did a ball sneak past? Were you positioned wrong? Each death teaches something valuable.' }
+        { title: '💡 Learn from Losses', desc: 'Watch how you lost. Did a ball sneak past? Were you positioned wrong? Each loss teaches something valuable.' }
     ];
 
     return (

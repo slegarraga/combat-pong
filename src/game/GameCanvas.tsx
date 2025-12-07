@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { useGameLoop } from './GameLoop';
-import { CANVAS_SIZE, COLORS, STARTING_LIVES } from './constants';
+import { CANVAS_SIZE, COLORS } from './constants';
 import { shareToTwitter } from './ShareCard';
 import { recordGame, type PlayerStats } from './PlayerStats';
 
@@ -12,7 +12,7 @@ interface GameCanvasProps {
 
 export const GameCanvas = ({ difficulty, onBack, userId }: GameCanvasProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const { score, lives, restart, togglePause, handleMouseMove, handleTouchMove, isPaused, gameOver } = useGameLoop(canvasRef, difficulty);
+    const { score, timeRemaining, streak, restart, togglePause, handleMouseMove, handleTouchMove, isPaused, gameOver } = useGameLoop(canvasRef, difficulty);
     const [shareStatus, setShareStatus] = useState<'idle' | 'sharing' | 'copied'>('idle');
     const [hasRecordedGame, setHasRecordedGame] = useState(false);
     const [stats, setStats] = useState<PlayerStats | null>(null);
@@ -20,17 +20,25 @@ export const GameCanvas = ({ difficulty, onBack, userId }: GameCanvasProps) => {
     const total = score.day + score.night;
     const dayPercent = total > 0 ? Math.round((score.day / total) * 100) : 50;
     const nightPercent = 100 - dayPercent;
+    const playerWon = dayPercent > 50;
+
+    // Format time as MM:SS
+    const formatTime = (seconds: number) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
 
     // Record game result when game is over
     useEffect(() => {
         if (gameOver && !hasRecordedGame) {
-            const result = dayPercent >= 50 ? 'win' : 'loss';
+            const result = playerWon ? 'win' : 'loss';
             recordGame(result, dayPercent, userId).then(newStats => {
                 setStats(newStats);
             });
             setHasRecordedGame(true);
         }
-    }, [gameOver, hasRecordedGame, dayPercent, userId]);
+    }, [gameOver, hasRecordedGame, playerWon, dayPercent, userId]);
 
     // Reset recording flag when game restarts
     const handleRestart = () => {
@@ -42,30 +50,21 @@ export const GameCanvas = ({ difficulty, onBack, userId }: GameCanvasProps) => {
     // Main share function
     const handleShare = async () => {
         setShareStatus('sharing');
-        await shareToTwitter({ dayPercent, difficulty, lives });
+        await shareToTwitter({ dayPercent, difficulty, lives: 0 }); // lives not used anymore
         setShareStatus('idle');
-    };
-
-    // Render hearts
-    const renderHearts = () => {
-        const hearts = [];
-        for (let i = 0; i < STARTING_LIVES; i++) {
-            hearts.push(
-                <span
-                    key={i}
-                    className={`text-lg sm:text-xl transition-all duration-300 ${i < lives ? 'scale-100' : 'scale-75 opacity-30 grayscale'}`}
-                >
-                    {i < lives ? '❤️' : '🖤'}
-                </span>
-            );
-        }
-        return hearts;
     };
 
     const getShareButtonText = () => {
         if (shareStatus === 'sharing') return '...';
         if (shareStatus === 'copied') return '✓ Paste in X!';
         return 'Share';
+    };
+
+    // Timer color based on time remaining
+    const getTimerColor = () => {
+        if (timeRemaining <= 10) return '#ef4444'; // red
+        if (timeRemaining <= 30) return '#f59e0b'; // orange
+        return '#ffffff'; // white
     };
 
     return (
@@ -83,9 +82,19 @@ export const GameCanvas = ({ difficulty, onBack, userId }: GameCanvasProps) => {
                 </button>
             )}
 
-            {/* Lives Display */}
-            <div className="flex gap-1 mb-2 sm:mb-3">
-                {renderHearts()}
+            {/* Timer Display */}
+            <div className="flex items-center gap-4 mb-2 sm:mb-3">
+                <div
+                    className="text-3xl sm:text-5xl font-black font-mono tracking-wider transition-colors duration-300"
+                    style={{ color: getTimerColor() }}
+                >
+                    ⏱️ {formatTime(timeRemaining)}
+                </div>
+                {streak > 0 && (
+                    <div className="bg-gradient-to-r from-orange-500 to-red-500 px-3 py-1 rounded-full text-white font-bold text-sm sm:text-base animate-pulse">
+                        🔥 {streak}x Streak
+                    </div>
+                )}
             </div>
 
             {/* Score Bar */}
@@ -127,15 +136,15 @@ export const GameCanvas = ({ difficulty, onBack, userId }: GameCanvasProps) => {
                 {gameOver && (
                     <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center rounded-lg sm:rounded-xl">
                         <div className="text-center text-white px-4">
-                            <p className="text-3xl sm:text-4xl font-black mb-2" style={{ color: COLORS.heart }}>
-                                GAME OVER
+                            <p className="text-xl sm:text-2xl text-gray-400 mb-1">⏱️ Time's Up!</p>
+                            <p
+                                className="text-3xl sm:text-4xl font-black mb-2"
+                                style={{ color: playerWon ? '#22c55e' : COLORS.nightBall }}
+                            >
+                                {playerWon ? '🏆 YOU WIN!' : '😢 YOU LOSE'}
                             </p>
-                            <p className="text-lg sm:text-xl font-bold mb-1" style={{ color: dayPercent >= 50 ? '#22c55e' : COLORS.nightBall }}>
-                                {dayPercent >= 50 ? '🏆 You won!' : '😢 Night wins'}
-                            </p>
-                            <p className="text-gray-400 text-sm mb-2">You controlled {dayPercent}% territory</p>
-                            <p className="text-gray-500 text-xs mb-4">
-                                (≥50% = Victory)
+                            <p className="text-gray-400 text-sm mb-2">
+                                Final: {dayPercent}% vs {nightPercent}%
                             </p>
 
                             {/* Stats Display */}
@@ -181,7 +190,7 @@ export const GameCanvas = ({ difficulty, onBack, userId }: GameCanvasProps) => {
             {/* Score Display */}
             <div className="mt-2 sm:mt-4 px-4 sm:px-8 py-2 sm:py-3 bg-black/60 backdrop-blur rounded-full text-white font-mono text-sm sm:text-lg flex gap-3 sm:gap-6 items-center shadow-lg">
                 <span style={{ color: COLORS.nightBall }}>{score.night}</span>
-                <span className="text-gray-600 text-xs">VS</span>
+                <span className="text-gray-600 text-xs">tiles</span>
                 <span style={{ color: COLORS.dayAccent }}>{score.day}</span>
             </div>
 
@@ -204,7 +213,7 @@ export const GameCanvas = ({ difficulty, onBack, userId }: GameCanvasProps) => {
 
             {/* Instructions */}
             <div className="mt-2 sm:mt-4 text-gray-400 text-[10px] sm:text-sm text-center max-w-xs sm:max-w-md px-4">
-                <p>Control your paddle to conquer territory!</p>
+                <p>Conquer more territory in 90 seconds to win!</p>
             </div>
 
             {/* Difficulty Badge */}

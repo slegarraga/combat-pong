@@ -2,11 +2,14 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import {
     CANVAS_SIZE, TILE_SIZE, GRID_WIDTH, GRID_HEIGHT,
     MAX_SPEED, MIN_SPEED, BASE_ACCELERATION, COLORS, DIFFICULTY,
-    PADDLE_WIDTH, PADDLE_HEIGHT, PADDLE_OFFSET, BALL_RADIUS, STARTING_LIVES
+    PADDLE_WIDTH, PADDLE_HEIGHT, PADDLE_OFFSET, BALL_RADIUS
 } from './constants';
 import type { GameState, Ball, Team, Paddle } from './types';
 
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD' | 'NIGHTMARE';
+
+// Match duration in seconds
+const MATCH_DURATION = 90;
 
 interface Particle {
     x: number;
@@ -26,13 +29,16 @@ export const useGameLoop = (
     const stateRef = useRef<GameState | null>(null);
     const particlesRef = useRef<Particle[]>([]);
     const shakeRef = useRef({ x: 0, y: 0, intensity: 0 });
-    const livesRef = useRef(STARTING_LIVES); // Use ref for real-time tracking
     const gameOverRef = useRef(false);
+    const startTimeRef = useRef<number>(0);
+    const lastTimeRef = useRef<number>(0);
 
     const [score, setScore] = useState({ day: 0, night: 0 });
-    const [lives, setLives] = useState(STARTING_LIVES); // For UI display
+    const [timeRemaining, setTimeRemaining] = useState(MATCH_DURATION);
     const [isPaused, setIsPaused] = useState(false);
     const [gameOver, setGameOver] = useState(false);
+    const [streak, setStreak] = useState(0);
+    const streakRef = useRef(0);
 
     const diffSettings = DIFFICULTY[difficulty];
 
@@ -128,9 +134,12 @@ export const useGameLoop = (
         };
         particlesRef.current = [];
         shakeRef.current = { x: 0, y: 0, intensity: 0 };
-        livesRef.current = STARTING_LIVES;
         gameOverRef.current = false;
-        setLives(STARTING_LIVES);
+        startTimeRef.current = performance.now();
+        lastTimeRef.current = performance.now();
+        streakRef.current = 0;
+        setStreak(0);
+        setTimeRemaining(MATCH_DURATION);
         setIsPaused(false);
         setGameOver(false);
     }, [difficulty]);
@@ -147,10 +156,17 @@ export const useGameLoop = (
             ballBottom > paddleY &&
             ballTop < paddleY + paddle.height
         ) {
-            triggerShake(6);
-            emitParticles(ball.x, ball.y, ball.team === 'day' ? COLORS.dayAccent : COLORS.nightAccent, 10);
+            // STREAK SYSTEM: consecutive hits = bigger speed boost!
+            streakRef.current += 1;
+            setStreak(streakRef.current);
 
-            ball.vy = bounceDirection * Math.abs(ball.vy) * 1.05;
+            const streakBonus = Math.min(streakRef.current * 0.03, 0.15); // Max 15% extra from streak
+            const speedMultiplier = 1.10 + streakBonus; // 1.10 base + up to 0.15 from streak
+
+            triggerShake(6 + Math.min(streakRef.current, 5));
+            emitParticles(ball.x, ball.y, ball.team === 'day' ? COLORS.dayAccent : COLORS.nightAccent, 10 + streakRef.current * 2);
+
+            ball.vy = bounceDirection * Math.abs(ball.vy) * speedMultiplier;
             const hitPoint = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
             ball.vx += hitPoint * 4;
 
@@ -196,39 +212,36 @@ export const useGameLoop = (
         }
     };
 
-    // Check boundaries - FIXED LIVES SYSTEM using ref
+    // Check boundaries - balls just bounce off all walls now
     const checkBoundaries = (ball: Ball): void => {
-        // Left/Right walls - normal bounce
+        // Left/Right walls - bounce
         if (ball.x < BALL_RADIUS || ball.x > CANVAS_SIZE - BALL_RADIUS) {
             ball.vx = -ball.vx;
             ball.x = Math.max(BALL_RADIUS, Math.min(CANVAS_SIZE - BALL_RADIUS, ball.x));
             triggerShake(2);
         }
 
-        // TOP wall - Night ball loses (AI misses) - just bounce
+        // TOP wall - bounce
         if (ball.y < BALL_RADIUS) {
-            ball.vy = Math.abs(ball.vy); // Force down
+            ball.vy = Math.abs(ball.vy);
             ball.y = BALL_RADIUS + 5;
+            triggerShake(2);
         }
 
-        // BOTTOM wall - Day ball loses = PLAYER LOSES A LIFE!
+        // BOTTOM wall - you MISSED! Ball slows down (0.85x penalty) + STREAK RESET!
         if (ball.y > CANVAS_SIZE - BALL_RADIUS) {
-            if (ball.team === 'day' && !gameOverRef.current) {
-                // Decrement lives using REF (not stale state)
-                livesRef.current = Math.max(0, livesRef.current - 1);
-                setLives(livesRef.current); // Update UI
-
-                triggerShake(15);
-                emitParticles(ball.x, ball.y, COLORS.heart, 20);
-
-                // Check game over
-                if (livesRef.current <= 0) {
-                    gameOverRef.current = true;
-                    setGameOver(true);
-                    if (stateRef.current) stateRef.current.isRunning = false;
-                }
+            if (ball.team === 'day') {
+                // Day ball = YOUR ball, you missed it! Streak resets!
+                streakRef.current = 0;
+                setStreak(0);
+                ball.vx *= 0.85;
+                ball.vy *= 0.85;
+                triggerShake(8);
+                emitParticles(ball.x, ball.y, '#ef4444', 6); // Red = bad
+            } else {
+                triggerShake(2);
             }
-            ball.vy = -Math.abs(ball.vy); // Force up
+            ball.vy = -Math.abs(ball.vy);
             ball.y = CANVAS_SIZE - BALL_RADIUS - 5;
         }
     };
@@ -268,9 +281,34 @@ export const useGameLoop = (
         aiPaddle.x = Math.max(0, Math.min(CANVAS_SIZE - aiPaddle.width, aiPaddle.x));
     };
 
-    const update = () => {
+    const update = (currentTime: number) => {
         const state = stateRef.current;
         if (!state || !state.isRunning || gameOverRef.current) return;
+
+        // Calculate elapsed time and remaining time
+        const elapsed = (currentTime - startTimeRef.current) / 1000;
+        const remaining = Math.max(0, MATCH_DURATION - elapsed);
+        setTimeRemaining(Math.ceil(remaining));
+
+        // Check if time is up
+        if (remaining <= 0) {
+            gameOverRef.current = true;
+            setGameOver(true);
+            state.isRunning = false;
+            triggerShake(10);
+
+            // Emit celebration particles for winner
+            const winner = state.dayScore > state.nightScore ? 'day' : 'night';
+            for (let i = 0; i < 5; i++) {
+                emitParticles(
+                    CANVAS_SIZE * Math.random(),
+                    CANVAS_SIZE * Math.random(),
+                    winner === 'day' ? COLORS.dayAccent : COLORS.nightAccent,
+                    15
+                );
+            }
+            return;
+        }
 
         updateAI(state);
         updateParticles();
@@ -401,9 +439,19 @@ export const useGameLoop = (
 
     const togglePause = useCallback(() => {
         if (!stateRef.current || gameOverRef.current) return;
-        stateRef.current.isRunning = !stateRef.current.isRunning;
-        setIsPaused(!stateRef.current.isRunning);
-        if (stateRef.current.isRunning) requestRef.current = requestAnimationFrame(update);
+
+        if (stateRef.current.isRunning) {
+            // Pausing - store elapsed time
+            stateRef.current.isRunning = false;
+            setIsPaused(true);
+        } else {
+            // Resuming - adjust start time to account for pause
+            const currentRemaining = Math.max(0, MATCH_DURATION - (lastTimeRef.current - startTimeRef.current) / 1000);
+            startTimeRef.current = performance.now() - (MATCH_DURATION - currentRemaining) * 1000;
+            stateRef.current.isRunning = true;
+            setIsPaused(false);
+            requestRef.current = requestAnimationFrame(update);
+        }
     }, []);
 
     useEffect(() => {
@@ -412,5 +460,5 @@ export const useGameLoop = (
         return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
     }, [difficulty]);
 
-    return { score, lives, restart, togglePause, handleMouseMove, handleTouchMove, isPaused, gameOver };
+    return { score, timeRemaining, streak, restart, togglePause, handleMouseMove, handleTouchMove, isPaused, gameOver };
 };

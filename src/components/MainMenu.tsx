@@ -30,8 +30,11 @@ export const MainMenu = ({ onStartGame, onLoginClick, session, onFindMatch, matc
             <h1 className="text-4xl sm:text-5xl md:text-7xl font-black mb-2 sm:mb-4 tracking-tighter relative z-10 drop-shadow-2xl text-center text-white">
                 COMBAT PONG
             </h1>
-            <p className="text-base sm:text-xl text-gray-400 mb-4 sm:mb-8 relative z-10">
+            <p className="text-base sm:text-xl text-gray-400 mb-2 relative z-10">
                 Conquer the territory!
+            </p>
+            <p className="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-8 relative z-10">
+                ⏱️ 90 seconds • Most territory wins
             </p>
 
             {/* Stats Display - if player has games */}
@@ -70,28 +73,28 @@ export const MainMenu = ({ onStartGame, onLoginClick, session, onFindMatch, matc
                         className="btn-gradient py-4 sm:py-4 min-h-[60px] rounded-xl font-bold text-sm sm:text-base transition-all hover:scale-105 active:scale-95 touch-manipulation text-white"
                     >
                         👶 EASY
-                        <div className="text-[10px] sm:text-xs opacity-80 mt-1">2 Balls • 3 ❤️</div>
+                        <div className="text-[10px] sm:text-xs opacity-80 mt-1">2 Balls • Slow</div>
                     </button>
                     <button
                         onClick={() => onStartGame('MEDIUM')}
                         className="btn-gradient py-4 sm:py-4 min-h-[60px] rounded-xl font-bold text-sm sm:text-base transition-all hover:scale-105 active:scale-95 touch-manipulation text-white"
                     >
                         ⚔️ MEDIUM
-                        <div className="text-[10px] sm:text-xs opacity-80 mt-1">2 Balls • 3 ❤️</div>
+                        <div className="text-[10px] sm:text-xs opacity-80 mt-1">2 Balls • Normal</div>
                     </button>
                     <button
                         onClick={() => onStartGame('HARD')}
                         className="btn-gradient py-4 sm:py-4 min-h-[60px] rounded-xl font-bold text-sm sm:text-base transition-all hover:scale-105 active:scale-95 touch-manipulation text-white"
                     >
                         🔥 HARD
-                        <div className="text-[10px] sm:text-xs opacity-80 mt-1">4 Balls • 3 ❤️</div>
+                        <div className="text-[10px] sm:text-xs opacity-80 mt-1">4 Balls • Fast</div>
                     </button>
                     <button
                         onClick={() => onStartGame('NIGHTMARE')}
                         className="btn-gradient py-4 sm:py-4 min-h-[60px] rounded-xl font-bold text-sm sm:text-base transition-all hover:scale-105 active:scale-95 touch-manipulation text-white"
                     >
                         💀 NIGHTMARE
-                        <div className="text-[10px] sm:text-xs opacity-80 mt-1">6 Balls • 3 ❤️</div>
+                        <div className="text-[10px] sm:text-xs opacity-80 mt-1">6 Balls • Chaos</div>
                     </button>
                 </div>
             </div>
@@ -123,7 +126,7 @@ export const MainMenu = ({ onStartGame, onLoginClick, session, onFindMatch, matc
             <div className="relative z-10 mt-6 sm:mt-10 flex flex-wrap justify-center gap-3 text-gray-500 text-xs sm:text-sm">
                 <a href="/how-to-play" className="hover:text-white transition-colors">📖 How to Play</a>
                 <span>•</span>
-                <a href="/tips" className="hover:text-white transition-colors">� Tips</a>
+                <a href="/tips" className="hover:text-white transition-colors">💡 Tips</a>
                 <span>•</span>
                 <a href="/faq" className="hover:text-white transition-colors">❓ FAQ</a>
             </div>
