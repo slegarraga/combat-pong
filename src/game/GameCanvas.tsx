@@ -120,11 +120,11 @@ export const GameCanvas = ({ difficulty, onBack, userId }: GameCanvasProps) => {
                     <div
                         className="absolute top-3 left-3 px-3 py-1 rounded-lg text-white font-bold text-xs pointer-events-none transition-all duration-150"
                         style={{
-                            background: `rgba(255, ${Math.max(100 - streak * 20, 0)}, 0, ${0.6 + Math.min(streak * 0.05, 0.3)})`,
+                            background: `rgba(255, ${Math.max(100 - streak * 30, 0)}, 0, ${0.6 + Math.min(streak * 0.1, 0.3)})`,
                             textShadow: '0 0 8px rgba(255, 100, 0, 0.6)'
                         }}
                     >
-                        🔥 {streak}x
+                        🔥 {streak}x ({(1 + streak * 0.25).toFixed(2)}x)
                     </div>
                 )}
 
