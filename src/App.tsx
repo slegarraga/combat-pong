@@ -5,26 +5,55 @@ import { MainMenu } from './components/MainMenu';
 import { GameCanvas } from './game/GameCanvas';
 import { useMatchmaking } from './game/network/Matchmaking';
 import { MultiplayerGame } from './game/network/MultiplayerGame';
+import { ModeLandingPage, HowToPlayPage } from './components/SEOPages';
+
+type Route = 'home' | 'game' | 'auth' | 'mode-easy' | 'mode-medium' | 'mode-hard' | 'mode-nightmare' | 'how-to-play' | 'multiplayer';
 
 function App() {
   const [session, setSession] = useState<any>(null);
-  const [gameStarted, setGameStarted] = useState(false);
-  const [showAuth, setShowAuth] = useState(false);
+  const [route, setRoute] = useState<Route>('home');
   const [difficulty, setDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD' | 'NIGHTMARE'>('MEDIUM');
 
   const { findMatch, match, status: matchmakingStatus } = useMatchmaking(session ? session.user : null);
 
+  // Parse URL for SEO routes
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path.startsWith('/mode/easy')) setRoute('mode-easy');
+    else if (path.startsWith('/mode/medium')) setRoute('mode-medium');
+    else if (path.startsWith('/mode/hard')) setRoute('mode-hard');
+    else if (path.startsWith('/mode/nightmare')) setRoute('mode-nightmare');
+    else if (path.startsWith('/how-to-play')) setRoute('how-to-play');
+    else if (path.startsWith('/multiplayer')) setRoute('multiplayer');
+    else setRoute('home');
+  }, []);
+
+  // Update URL when route changes (for programmatic SEO)
+  const navigateTo = (newRoute: Route) => {
+    const pathMap: Record<Route, string> = {
+      'home': '/',
+      'game': '/',
+      'auth': '/',
+      'mode-easy': '/mode/easy',
+      'mode-medium': '/mode/medium',
+      'mode-hard': '/mode/hard',
+      'mode-nightmare': '/mode/nightmare',
+      'how-to-play': '/how-to-play',
+      'multiplayer': '/multiplayer'
+    };
+    window.history.pushState({}, '', pathMap[newRoute]);
+    setRoute(newRoute);
+  };
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) setShowAuth(false);
+      if (session && route === 'auth') navigateTo('home');
     });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) setShowAuth(false);
+      if (session && route === 'auth') navigateTo('home');
     });
 
     return () => subscription.unsubscribe();
@@ -32,53 +61,69 @@ function App() {
 
   const startGame = (diff: 'EASY' | 'MEDIUM' | 'HARD' | 'NIGHTMARE') => {
     setDifficulty(diff);
-    setGameStarted(true);
+    navigateTo('game');
   };
 
-  // If Multiplayer Match Found
+  // Multiplayer Match
   if (match) {
     return (
       <MultiplayerGame
         roomId={match.roomId}
         isHost={match.isHost}
-        onExit={() => window.location.reload()} // Simple exit for now
+        onExit={() => { navigateTo('home'); window.location.reload(); }}
       />
     );
   }
 
-  // If Single Player Game Started
-  if (gameStarted) {
+  // Game View
+  if (route === 'game') {
     return (
-      <div className="w-full h-full">
-        <button
-          onClick={() => setGameStarted(false)}
-          className="fixed top-4 left-4 bg-gray-800 text-white px-4 py-2 rounded opacity-50 hover:opacity-100 transition z-50"
-        >
-          Back to Menu
-        </button>
-        <GameCanvas difficulty={difficulty} />
-      </div>
+      <GameCanvas
+        difficulty={difficulty}
+        onBack={() => navigateTo('home')}
+      />
     );
   }
 
-  if (showAuth && !session) {
+  // Auth View
+  if (route === 'auth') {
     return (
       <div className="relative">
         <button
-          onClick={() => setShowAuth(false)}
+          onClick={() => navigateTo('home')}
           className="fixed top-4 left-4 text-white z-50"
         >
           ← Back
         </button>
         <Auth />
       </div>
-    )
+    );
   }
 
+  // SEO Mode Landing Pages
+  if (route === 'mode-easy') {
+    return <ModeLandingPage mode="EASY" onPlay={() => startGame('EASY')} onBack={() => navigateTo('home')} />;
+  }
+  if (route === 'mode-medium') {
+    return <ModeLandingPage mode="MEDIUM" onPlay={() => startGame('MEDIUM')} onBack={() => navigateTo('home')} />;
+  }
+  if (route === 'mode-hard') {
+    return <ModeLandingPage mode="HARD" onPlay={() => startGame('HARD')} onBack={() => navigateTo('home')} />;
+  }
+  if (route === 'mode-nightmare') {
+    return <ModeLandingPage mode="NIGHTMARE" onPlay={() => startGame('NIGHTMARE')} onBack={() => navigateTo('home')} />;
+  }
+
+  // How to Play Page
+  if (route === 'how-to-play') {
+    return <HowToPlayPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  }
+
+  // Main Menu (Home)
   return (
     <MainMenu
       onStartGame={startGame}
-      onLoginClick={() => setShowAuth(true)}
+      onLoginClick={() => navigateTo('auth')}
       session={session}
       onFindMatch={findMatch}
       matchmakingStatus={matchmakingStatus}

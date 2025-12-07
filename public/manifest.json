@@ -1,0 +1,36 @@
+{
+    "name": "Combat Pong",
+    "short_name": "Combat Pong",
+    "description": "The most addictive territory control game. Battle AI or friends in real-time multiplayer!",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#1a1a2e",
+    "theme_color": "#7b2cbf",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "/favicon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/favicon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": [
+        "games",
+        "arcade"
+    ],
+    "screenshots": [
+        {
+            "src": "/screenshot-1.png",
+            "sizes": "1280x720",
+            "type": "image/png",
+            "label": "Combat Pong Gameplay"
+        }
+    ]
+}

@@ -89,6 +89,15 @@ export const MainMenu = ({ onStartGame, onLoginClick, session, onFindMatch, matc
                 )}
             </div>
 
+            {/* SEO Internal Links */}
+            <div className="relative z-10 mt-6 sm:mt-10 flex flex-wrap justify-center gap-3 text-gray-500 text-xs sm:text-sm">
+                <a href="/how-to-play" className="hover:text-white transition-colors">📖 How to Play</a>
+                <span>•</span>
+                <a href="/mode/easy" className="hover:text-white transition-colors">👶 Easy Mode</a>
+                <span>•</span>
+                <a href="/mode/nightmare" className="hover:text-white transition-colors">💀 Nightmare</a>
+            </div>
+
             {/* Auth buttons */}
             {session ? (
                 <button
@@ -106,12 +115,17 @@ export const MainMenu = ({ onStartGame, onLoginClick, session, onFindMatch, matc
                 </button>
             )}
 
-            {/* Footer */}
+            {/* Footer with SEO links */}
             <div className="absolute bottom-3 sm:bottom-6 text-gray-500 text-[10px] sm:text-xs text-center px-4">
-                Inspired by{' '}
-                <a href="https://github.com/vnglst/pong-wars" className="underline hover:text-white transition-colors" target="_blank" rel="noopener noreferrer">
-                    Pong Wars
-                </a>
+                <a href="/how-to-play" className="hover:text-white transition-colors mr-2">How to Play</a>
+                •
+                <span className="mx-2">Inspired by{' '}
+                    <a href="https://github.com/vnglst/pong-wars" className="underline hover:text-white transition-colors" target="_blank" rel="noopener noreferrer">
+                        Pong Wars
+                    </a>
+                </span>
+                •
+                <span className="ml-2">© 2024 Combat Pong</span>
             </div>
         </div>
     );
