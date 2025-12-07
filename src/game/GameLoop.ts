@@ -32,6 +32,7 @@ export const useGameLoop = (
     const gameOverRef = useRef(false);
     const startTimeRef = useRef<number>(0);
     const lastTimeRef = useRef<number>(0);
+    const pauseTimeRef = useRef<number>(0); // Track when we paused
 
     const [score, setScore] = useState({ day: 0, night: 0 });
     const [timeRemaining, setTimeRemaining] = useState(MATCH_DURATION);
@@ -463,13 +464,14 @@ export const useGameLoop = (
         if (!stateRef.current || gameOverRef.current) return;
 
         if (stateRef.current.isRunning) {
-            // Pausing - store elapsed time
+            // Pausing - store the current time
+            pauseTimeRef.current = performance.now();
             stateRef.current.isRunning = false;
             setIsPaused(true);
         } else {
-            // Resuming - adjust start time to account for pause
-            const currentRemaining = Math.max(0, MATCH_DURATION - (lastTimeRef.current - startTimeRef.current) / 1000);
-            startTimeRef.current = performance.now() - (MATCH_DURATION - currentRemaining) * 1000;
+            // Resuming - adjust start time by how long we were paused
+            const pauseDuration = performance.now() - pauseTimeRef.current;
+            startTimeRef.current += pauseDuration;
             stateRef.current.isRunning = true;
             setIsPaused(false);
             requestRef.current = requestAnimationFrame(update);
