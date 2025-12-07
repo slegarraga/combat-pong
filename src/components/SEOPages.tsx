@@ -222,7 +222,7 @@ export const ModeLandingPage = ({ mode, onPlay, onBack }: ModeLandingPageProps) 
                         <a href="/mode/nightmare" className="hover:text-white">Nightmare Mode</a>
                         <a href="/how-to-play" className="hover:text-white">How to Play</a>
                     </nav>
-                    <p className="text-gray-700 text-xs mt-4">© 2024 Combat Pong. Free browser game.</p>
+                    <p className="text-gray-700 text-xs mt-4">© 2025 Combat Pong. Free browser game.</p>
                 </div>
             </footer>
 

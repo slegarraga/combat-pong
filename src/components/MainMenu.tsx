@@ -125,7 +125,7 @@ export const MainMenu = ({ onStartGame, onLoginClick, session, onFindMatch, matc
                     </a>
                 </span>
                 •
-                <span className="ml-2">© 2024 Combat Pong</span>
+                <span className="ml-2">© 2025 Combat Pong</span>
             </div>
         </div>
     );

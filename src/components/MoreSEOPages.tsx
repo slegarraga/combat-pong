@@ -360,7 +360,7 @@ const Footer = () => (
                 <a href="/mode/hard" className="hover:text-white">Hard Mode</a>
                 <a href="/mode/nightmare" className="hover:text-white">Nightmare Mode</a>
             </nav>
-            <p className="text-gray-700 text-xs">© 2024 Combat Pong. Free online browser game.</p>
+            <p className="text-gray-700 text-xs">© 2025 Combat Pong. Free online browser game.</p>
         </div>
     </footer>
 );

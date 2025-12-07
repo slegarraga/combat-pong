@@ -165,7 +165,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
 
             {/* Instructions */}
             <div className="mt-2 sm:mt-4 text-gray-400 text-[10px] sm:text-sm text-center max-w-xs sm:max-w-md px-4">
-                <p>Protect your <span style={{ color: COLORS.dayAccent }}>☀️ Day</span> balls!</p>
+                <p>Control your paddle to conquer territory!</p>
             </div>
 
             {/* Difficulty Badge */}
