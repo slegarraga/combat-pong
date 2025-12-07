@@ -5,6 +5,7 @@ interface ShareCardData {
     dayPercent: number;
     difficulty: string;
     lives: number;
+    playerWon?: boolean;
 }
 
 export const generateShareCard = async (data: ShareCardData): Promise<Blob> => {
@@ -112,20 +113,24 @@ export const shareToTwitter = async (data: ShareCardData): Promise<'success' | '
     // Upload to Supabase to get public URL
     const imageUrl = await uploadToSupabase(imageBlob);
 
-    // Build tweet with more context
-    const livesEmoji = data.lives > 0 ? '❤️'.repeat(data.lives) : '💀';
-    const difficultyEmoji = data.difficulty === 'NIGHTMARE' ? '💀' : data.difficulty === 'HARD' ? '🔥' : data.difficulty === 'MEDIUM' ? '⚔️' : '👶';
+    // Determine win/loss
+    const won = data.playerWon ?? data.dayPercent > 50;
+    const result = won ? '🏆 WON' : '💀 LOST';
+    const diffEmoji = data.difficulty === 'NIGHTMARE' ? '👹' : data.difficulty === 'HARD' ? '🔥' : data.difficulty === 'MEDIUM' ? '⚔️' : '🌱';
 
-    const tweetText = `${data.dayPercent}% territory on ${difficultyEmoji} ${data.difficulty} mode ${livesEmoji}
+    // Short, punchy tweet
+    const tweetText = `${result} with ${data.dayPercent}% territory in Combat Pong ${diffEmoji}
 
-Can you beat my score? 🎮`;
+Beat my score 👇`;
+
+    const gameUrl = window.location.origin;
 
     if (imageUrl) {
         const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(imageUrl)}`;
         window.open(tweetUrl, '_blank', 'width=550,height=420');
         return 'success';
     } else {
-        const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(window.location.origin)}`;
+        const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(gameUrl)}`;
         window.open(tweetUrl, '_blank', 'width=550,height=420');
         return 'fallback';
     }

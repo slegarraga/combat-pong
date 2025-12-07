@@ -50,7 +50,7 @@ export const GameCanvas = ({ difficulty, onBack, userId }: GameCanvasProps) => {
     // Main share function
     const handleShare = async () => {
         setShareStatus('sharing');
-        await shareToTwitter({ dayPercent, difficulty, lives: 0 }); // lives not used anymore
+        await shareToTwitter({ dayPercent, difficulty, lives: 0, playerWon });
         setShareStatus('idle');
     };
 
