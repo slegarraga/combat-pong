@@ -1,21 +1,43 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useGameLoop } from './GameLoop';
 import { CANVAS_SIZE, COLORS, STARTING_LIVES } from './constants';
 import { shareToTwitter } from './ShareCard';
+import { recordGame, type PlayerStats } from './PlayerStats';
 
 interface GameCanvasProps {
     difficulty: 'EASY' | 'MEDIUM' | 'HARD' | 'NIGHTMARE';
     onBack?: () => void;
+    userId?: string;
 }
 
-export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
+export const GameCanvas = ({ difficulty, onBack, userId }: GameCanvasProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const { score, lives, restart, togglePause, handleMouseMove, handleTouchMove, isPaused, gameOver } = useGameLoop(canvasRef, difficulty);
     const [shareStatus, setShareStatus] = useState<'idle' | 'sharing' | 'copied'>('idle');
+    const [hasRecordedGame, setHasRecordedGame] = useState(false);
+    const [stats, setStats] = useState<PlayerStats | null>(null);
 
     const total = score.day + score.night;
     const dayPercent = total > 0 ? Math.round((score.day / total) * 100) : 50;
     const nightPercent = 100 - dayPercent;
+
+    // Record game result when game is over
+    useEffect(() => {
+        if (gameOver && !hasRecordedGame) {
+            const result = dayPercent >= 50 ? 'win' : 'loss';
+            recordGame(result, dayPercent, userId).then(newStats => {
+                setStats(newStats);
+            });
+            setHasRecordedGame(true);
+        }
+    }, [gameOver, hasRecordedGame, dayPercent, userId]);
+
+    // Reset recording flag when game restarts
+    const handleRestart = () => {
+        setHasRecordedGame(false);
+        setStats(null);
+        restart();
+    };
 
     // Main share function
     const handleShare = async () => {
@@ -105,8 +127,19 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                 {gameOver && (
                     <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center rounded-lg sm:rounded-xl">
                         <div className="text-center text-white px-4">
-                            <p className="text-3xl sm:text-4xl font-black mb-2" style={{ color: COLORS.heart }}>GAME OVER</p>
-                            <p className="text-gray-400 text-sm mb-4">You controlled {dayPercent}%</p>
+                            <p className="text-3xl sm:text-4xl font-black mb-2" style={{ color: dayPercent >= 50 ? '#22c55e' : COLORS.heart }}>
+                                {dayPercent >= 50 ? 'VICTORY!' : 'GAME OVER'}
+                            </p>
+                            <p className="text-gray-400 text-sm mb-2">You controlled {dayPercent}%</p>
+
+                            {/* Stats Display */}
+                            {stats && (
+                                <div className="text-xs text-gray-500 mb-4 flex gap-3 justify-center">
+                                    <span>🏆 {stats.wins}W</span>
+                                    <span>📊 {stats.gamesPlayed} games</span>
+                                    <span>⭐ Best: {stats.bestScore}%</span>
+                                </div>
+                            )}
 
                             <div className="flex flex-col gap-2">
                                 {/* Share */}
@@ -122,9 +155,9 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                                     {getShareButtonText()}
                                 </button>
 
-                                {/* Play Again - Animated Gradient Button */}
+                                {/* Play Again */}
                                 <button
-                                    onClick={restart}
+                                    onClick={handleRestart}
                                     className="btn-gradient px-6 py-3 min-h-[48px] rounded-xl font-bold text-base text-white touch-manipulation flex items-center justify-center gap-2 shadow-lg"
                                 >
                                     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -156,7 +189,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                     {isPaused ? '▶️ Play' : '⏸️'}
                 </button>
                 <button
-                    onClick={restart}
+                    onClick={handleRestart}
                     className="btn-gradient px-4 sm:px-5 py-3 sm:py-2 min-h-[44px] min-w-[80px] rounded-full text-white text-sm sm:text-base font-bold touch-manipulation"
                 >
                     🔄

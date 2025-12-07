@@ -1,4 +1,6 @@
-import { supabase } from '../supabaseClient'
+import { useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
+import { getLocalStats, getWinRate, type PlayerStats } from '../game/PlayerStats';
 
 interface MainMenuProps {
     onStartGame: (difficulty: 'EASY' | 'MEDIUM' | 'HARD' | 'NIGHTMARE') => void;
@@ -9,18 +11,46 @@ interface MainMenuProps {
 }
 
 export const MainMenu = ({ onStartGame, onLoginClick, session, onFindMatch, matchmakingStatus }: MainMenuProps) => {
+    const [stats, setStats] = useState<PlayerStats | null>(null);
+
+    // Load stats on mount
+    useEffect(() => {
+        const localStats = getLocalStats();
+        if (localStats.gamesPlayed > 0) {
+            setStats(localStats);
+        }
+    }, []);
+
     return (
         <div
             className="flex flex-col items-center justify-center min-h-screen min-h-[100dvh] px-4 py-8 sm:py-12 md:py-16 text-white relative overflow-hidden"
             style={{ background: '#1a1a2e' }}
         >
-            {/* Title - Simple white */}
+            {/* Title */}
             <h1 className="text-4xl sm:text-5xl md:text-7xl font-black mb-2 sm:mb-4 tracking-tighter relative z-10 drop-shadow-2xl text-center text-white">
                 COMBAT PONG
             </h1>
-            <p className="text-base sm:text-xl text-gray-400 mb-6 sm:mb-12 relative z-10">
-                Protect your territory!
+            <p className="text-base sm:text-xl text-gray-400 mb-4 sm:mb-8 relative z-10">
+                Conquer the territory!
             </p>
+
+            {/* Stats Display - if player has games */}
+            {stats && stats.gamesPlayed > 0 && (
+                <div className="relative z-10 mb-4 sm:mb-6 flex gap-4 sm:gap-6 text-center">
+                    <div className="bg-white/5 rounded-xl px-4 py-2 sm:px-6 sm:py-3">
+                        <div className="text-xl sm:text-2xl font-bold text-green-400">{stats.wins}</div>
+                        <div className="text-[10px] sm:text-xs text-gray-500">Wins</div>
+                    </div>
+                    <div className="bg-white/5 rounded-xl px-4 py-2 sm:px-6 sm:py-3">
+                        <div className="text-xl sm:text-2xl font-bold text-blue-400">{getWinRate(stats)}%</div>
+                        <div className="text-[10px] sm:text-xs text-gray-500">Win Rate</div>
+                    </div>
+                    <div className="bg-white/5 rounded-xl px-4 py-2 sm:px-6 sm:py-3">
+                        <div className="text-xl sm:text-2xl font-bold text-purple-400">{stats.bestScore}%</div>
+                        <div className="text-[10px] sm:text-xs text-gray-500">Best</div>
+                    </div>
+                </div>
+            )}
 
             {/* User Status */}
             {session && (
@@ -93,9 +123,9 @@ export const MainMenu = ({ onStartGame, onLoginClick, session, onFindMatch, matc
             <div className="relative z-10 mt-6 sm:mt-10 flex flex-wrap justify-center gap-3 text-gray-500 text-xs sm:text-sm">
                 <a href="/how-to-play" className="hover:text-white transition-colors">📖 How to Play</a>
                 <span>•</span>
-                <a href="/mode/easy" className="hover:text-white transition-colors">👶 Easy Mode</a>
+                <a href="/tips" className="hover:text-white transition-colors">� Tips</a>
                 <span>•</span>
-                <a href="/mode/nightmare" className="hover:text-white transition-colors">💀 Nightmare</a>
+                <a href="/faq" className="hover:text-white transition-colors">❓ FAQ</a>
             </div>
 
             {/* Auth buttons */}
@@ -117,7 +147,7 @@ export const MainMenu = ({ onStartGame, onLoginClick, session, onFindMatch, matc
 
             {/* Footer with SEO links */}
             <div className="absolute bottom-3 sm:bottom-6 text-gray-500 text-[10px] sm:text-xs text-center px-4">
-                <a href="/how-to-play" className="hover:text-white transition-colors mr-2">How to Play</a>
+                <a href="/about" className="hover:text-white transition-colors mr-2">About</a>
                 •
                 <span className="mx-2">Inspired by{' '}
                     <a href="https://github.com/vnglst/pong-wars" className="underline hover:text-white transition-colors" target="_blank" rel="noopener noreferrer">
