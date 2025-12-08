@@ -11,8 +11,9 @@ import { MechanicsPage, StreakGuidePage, MobileGuidePage, ControlsPage } from '.
 import { PongHistoryPage, ChallengePage, HighScorePage, BrowserCompatPage, UpdatesPage, VsOtherGamesPage } from './components/AdditionalSEOPages';
 import { UnblockedPage, WorkBreakPage, ReactionTimePage, OfflinePage, ArcadePage, AccessibilityPage } from './components/TargetedSEOPages';
 import { KidsPage, TwoPlayerPage, BestFreeGamesPage, NoDownloadPage, RelaxingPage, FocusPage } from './components/MoreTargetedSEOPages';
+import { BoredPage, WaitingRoomPage, LunchBreakPage, QuickGamesPage, AddictivePage, SoloPage, BallGamesPage, RetroPage, PaddleGamesPage, TerritoryPage, TimerGamesPage, SkillGamesPage } from './components/FinalSEOPages';
 
-type Route = 'home' | 'game' | 'auth' | 'mode-easy' | 'mode-medium' | 'mode-hard' | 'mode-nightmare' | 'how-to-play' | 'multiplayer' | 'faq' | 'about' | 'tips' | 'mechanics' | 'streak-guide' | 'mobile' | 'controls' | 'history' | 'challenge' | 'high-score' | 'browsers' | 'updates' | 'compare' | 'unblocked' | 'work-break' | 'reaction-time' | 'offline' | 'arcade' | 'accessibility' | 'kids' | 'two-player' | 'best-free' | 'no-download' | 'relaxing' | 'focus';
+type Route = 'home' | 'game' | 'auth' | 'mode-easy' | 'mode-medium' | 'mode-hard' | 'mode-nightmare' | 'how-to-play' | 'multiplayer' | 'faq' | 'about' | 'tips' | 'mechanics' | 'streak-guide' | 'mobile' | 'controls' | 'history' | 'challenge' | 'high-score' | 'browsers' | 'updates' | 'compare' | 'unblocked' | 'work-break' | 'reaction-time' | 'offline' | 'arcade' | 'accessibility' | 'kids' | 'two-player' | 'best-free' | 'no-download' | 'relaxing' | 'focus' | 'bored' | 'waiting-room' | 'lunch-break' | 'quick-games' | 'addictive' | 'solo' | 'ball-games' | 'retro' | 'paddle-games' | 'territory' | 'timer-games' | 'skill-games';
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -55,6 +56,18 @@ function App() {
     else if (path.startsWith('/no-download')) setRoute('no-download');
     else if (path.startsWith('/relaxing')) setRoute('relaxing');
     else if (path.startsWith('/focus')) setRoute('focus');
+    else if (path.startsWith('/bored')) setRoute('bored');
+    else if (path.startsWith('/waiting-room')) setRoute('waiting-room');
+    else if (path.startsWith('/lunch-break')) setRoute('lunch-break');
+    else if (path.startsWith('/quick-games')) setRoute('quick-games');
+    else if (path.startsWith('/addictive')) setRoute('addictive');
+    else if (path.startsWith('/solo')) setRoute('solo');
+    else if (path.startsWith('/ball-games')) setRoute('ball-games');
+    else if (path.startsWith('/retro')) setRoute('retro');
+    else if (path.startsWith('/paddle-games')) setRoute('paddle-games');
+    else if (path.startsWith('/territory')) setRoute('territory');
+    else if (path.startsWith('/timer-games')) setRoute('timer-games');
+    else if (path.startsWith('/skill-games')) setRoute('skill-games');
     else setRoute('home');
   }, []);
 
@@ -94,7 +107,19 @@ function App() {
       'best-free': '/best-free',
       'no-download': '/no-download',
       'relaxing': '/relaxing',
-      'focus': '/focus'
+      'focus': '/focus',
+      'bored': '/bored',
+      'waiting-room': '/waiting-room',
+      'lunch-break': '/lunch-break',
+      'quick-games': '/quick-games',
+      'addictive': '/addictive',
+      'solo': '/solo',
+      'ball-games': '/ball-games',
+      'retro': '/retro',
+      'paddle-games': '/paddle-games',
+      'territory': '/territory',
+      'timer-games': '/timer-games',
+      'skill-games': '/skill-games'
     };
     window.history.pushState({}, '', pathMap[newRoute]);
     setRoute(newRoute);
@@ -193,6 +218,19 @@ function App() {
   if (route === 'relaxing') return <RelaxingPage onBack={() => navigateTo('home')} onPlay={startGame} />;
   if (route === 'focus') return <FocusPage onBack={() => navigateTo('home')} onPlay={startGame} />;
 
+  // Final Long-Tail SEO Pages
+  if (route === 'bored') return <BoredPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'waiting-room') return <WaitingRoomPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'lunch-break') return <LunchBreakPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'quick-games') return <QuickGamesPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'addictive') return <AddictivePage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'solo') return <SoloPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'ball-games') return <BallGamesPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'retro') return <RetroPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'paddle-games') return <PaddleGamesPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'territory') return <TerritoryPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'timer-games') return <TimerGamesPage onBack={() => navigateTo('home')} onPlay={startGame} />;
+  if (route === 'skill-games') return <SkillGamesPage onBack={() => navigateTo('home')} onPlay={startGame} />;
   // Main Menu (Home)
   return (
     <MainMenu

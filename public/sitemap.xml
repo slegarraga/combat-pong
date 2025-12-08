@@ -18,70 +18,60 @@
   </url>
   
   <!-- Game Modes - High Priority -->
-  <url>
-    <loc>https://combatpong.com/mode/easy</loc>
-    <lastmod>2024-12-07</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.9</priority>
-  </url>
+  <url><loc>https://combatpong.com/mode/easy</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://combatpong.com/mode/medium</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://combatpong.com/mode/hard</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://combatpong.com/mode/nightmare</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
   
-  <url>
-    <loc>https://combatpong.com/mode/medium</loc>
-    <lastmod>2024-12-07</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  
-  <url>
-    <loc>https://combatpong.com/mode/hard</loc>
-    <lastmod>2024-12-07</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  
-  <url>
-    <loc>https://combatpong.com/mode/nightmare</loc>
-    <lastmod>2024-12-07</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  
-  <!-- Multiplayer -->
-  <url>
-    <loc>https://combatpong.com/multiplayer</loc>
-    <lastmod>2024-12-07</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  
-  <!-- Educational Content -->
-  <url>
-    <loc>https://combatpong.com/how-to-play</loc>
-    <lastmod>2024-12-07</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  
-  <url>
-    <loc>https://combatpong.com/tips</loc>
-    <lastmod>2024-12-07</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  
-  <!-- Information Pages -->
-  <url>
-    <loc>https://combatpong.com/faq</loc>
-    <lastmod>2024-12-07</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  
-  <url>
-    <loc>https://combatpong.com/about</loc>
-    <lastmod>2024-12-07</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  
+  <!-- Core Info Pages -->
+  <url><loc>https://combatpong.com/how-to-play</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://combatpong.com/multiplayer</loc><lastmod>2024-12-07</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://combatpong.com/tips</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://combatpong.com/faq</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://combatpong.com/about</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+
+  <!-- Guides -->
+  <url><loc>https://combatpong.com/mechanics</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://combatpong.com/streak-guide</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://combatpong.com/controls</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://combatpong.com/mobile</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://combatpong.com/high-score</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+
+  <!-- History & Compare -->
+  <url><loc>https://combatpong.com/history</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/compare</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/updates</loc><lastmod>2024-12-07</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/challenge</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/browsers</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
+
+  <!-- Target Audiences -->
+  <url><loc>https://combatpong.com/unblocked</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://combatpong.com/work-break</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/kids</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/relaxing</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/focus</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/reaction-time</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/accessibility</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
+
+  <!-- Game Types -->
+  <url><loc>https://combatpong.com/arcade</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/two-player</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/offline</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://combatpong.com/best-free</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/no-download</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+
+  <!-- Long-Tail Keywords (NEW) -->
+  <url><loc>https://combatpong.com/bored</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/waiting-room</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/lunch-break</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/quick-games</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/addictive</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/solo</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/ball-games</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/retro</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/paddle-games</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/territory</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/timer-games</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://combatpong.com/skill-games</loc><lastmod>2024-12-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+
 </urlset>
