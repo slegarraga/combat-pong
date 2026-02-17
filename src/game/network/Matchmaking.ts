@@ -1,11 +1,24 @@
+/**
+ * Matchmaking hook — finds or creates a multiplayer room via Supabase Presence.
+ *
+ * Flow:
+ *   1. Player calls `findMatch()` which joins the `pong_lobby_v1` presence channel
+ *   2. On sync, checks if any other user is broadcasting `waiting_host` status
+ *   3. If a host is found → joins their room as client
+ *   4. If no host found after 1.5s → becomes the host and waits for a client
+ *   5. Returns a `MatchResult` with the room ID and host/client role
+ */
+
 import { useRef, useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 
 export interface MatchResult {
-    roomId: string; // The channel name to join
+    /** The Supabase Realtime channel name to join (e.g. `room_<userId>`). */
+    roomId: string;
     isHost: boolean;
 }
 
+/** Hook that handles lobby matchmaking. Returns `findMatch` to start and `match` when paired. */
 export const useMatchmaking = (user: any) => {
     const [match, setMatch] = useState<MatchResult | null>(null);
     const [status, setStatus] = useState<'idle' | 'searching' | 'matched'>('idle');

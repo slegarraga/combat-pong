@@ -1,3 +1,28 @@
+/**
+ * Core game loop — physics, collision detection, rendering, and input handling.
+ *
+ * Exposed as a React hook (`useGameLoop`) that owns the entire game lifecycle:
+ *   1. Initializes the 24x24 territory grid (top half = Night, bottom half = Day)
+ *   2. Spawns balls based on the chosen difficulty
+ *   3. Runs a `requestAnimationFrame` loop that each frame:
+ *      - Updates the AI paddle (tracks nearest incoming Day ball)
+ *      - Checks paddle-ball collisions (triggers the streak system)
+ *      - Detects ball-tile collisions (converts enemy tiles)
+ *      - Enforces wall boundaries (miss penalty + streak reset)
+ *      - Applies random micro-acceleration for unpredictable movement
+ *      - Renders tiles, paddles, balls (with trails), and particles
+ *   4. Ends the match after 90 seconds — whoever controls >50% wins
+ *
+ * Streak system:
+ *   Every consecutive paddle hit adds +0.25x speed to that ball (cumulative).
+ *   Missing a ball at the wall resets your streak to 0 and slows the ball by 15%.
+ *
+ * Visual effects:
+ *   - Particle bursts on tile captures and paddle hits
+ *   - Screen shake that scales with streak intensity
+ *   - Ball trails rendered as faded ghost positions
+ */
+
 import { useRef, useEffect, useState, useCallback } from 'react';
 import {
     CANVAS_SIZE, TILE_SIZE, GRID_WIDTH, GRID_HEIGHT,
@@ -8,19 +33,24 @@ import type { GameState, Ball, Team, Paddle } from './types';
 
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD' | 'NIGHTMARE';
 
-// Match duration in seconds
-const MATCH_DURATION = 90;
+const MATCH_DURATION = 90; // seconds
 
+/** A short-lived visual particle emitted on impacts and tile captures. */
 interface Particle {
     x: number;
     y: number;
     vx: number;
     vy: number;
+    /** 1.0 → 0.0 over the particle's lifetime. Used as alpha. */
     life: number;
     color: string;
     size: number;
 }
 
+/**
+ * React hook that runs the entire single-player game.
+ * Returns reactive state (score, time, streak) and handlers for the UI layer.
+ */
 export const useGameLoop = (
     canvasRef: React.RefObject<HTMLCanvasElement>,
     difficulty: Difficulty = 'MEDIUM'
@@ -147,6 +177,11 @@ export const useGameLoop = (
         setGameOver(false);
     }, [difficulty]);
 
+    /**
+     * AABB collision test between a ball and a paddle.
+     * On hit: increments streak, boosts ball speed, applies angle deflection.
+     * `bounceDirection` is -1 (bounce up from player paddle) or +1 (bounce down from AI paddle).
+     */
     const checkPaddleCollision = (ball: Ball, paddle: Paddle, paddleY: number, bounceDirection: number) => {
         const ballTop = ball.y - BALL_RADIUS;
         const ballBottom = ball.y + BALL_RADIUS;
@@ -192,6 +227,7 @@ export const useGameLoop = (
         return false;
     };
 
+    /** Scans the grid for an enemy tile overlapping the ball and converts it. */
     const detectTileCollision = (ball: Ball, ownership: Team[]) => {
         const halfTile = TILE_SIZE / 2;
         const enemyTeam: Team = ball.team === 'day' ? 'night' : 'day';
@@ -223,7 +259,11 @@ export const useGameLoop = (
         }
     };
 
-    // Check boundaries - balls just bounce off all walls now
+    /**
+     * Wall boundary checks. All four walls bounce the ball.
+     * Missing your own ball at the bottom/top wall triggers a miss penalty:
+     * streak resets to 0, speed multiplier resets, and ball slows by 15%.
+     */
     const checkBoundaries = (ball: Ball): void => {
         // Left/Right walls - bounce
         if (ball.x < BALL_RADIUS || ball.x > CANVAS_SIZE - BALL_RADIUS) {
@@ -267,6 +307,7 @@ export const useGameLoop = (
         }
     };
 
+    /** Applies random micro-acceleration and enforces speed limits, then moves the ball. */
     const updateBallPhysics = (ball: Ball) => {
         const accel = BASE_ACCELERATION * diffSettings.speedMod;
         ball.vx += (Math.random() - 0.5) * accel;
@@ -293,6 +334,7 @@ export const useGameLoop = (
         ball.y += ball.vy;
     };
 
+    /** AI paddle controller — lerps toward the nearest incoming Day ball. */
     const updateAI = (state: GameState) => {
         const aiPaddle = state.aiPaddle;
         const threats = state.balls.filter(b => b.team === 'day' && b.vy < 0).sort((a, b) => a.y - b.y);
@@ -304,6 +346,7 @@ export const useGameLoop = (
         aiPaddle.x = Math.max(0, Math.min(CANVAS_SIZE - aiPaddle.width, aiPaddle.x));
     };
 
+    /** Main update tick — called once per animation frame. */
     const update = (currentTime: number) => {
         const state = stateRef.current;
         if (!state || !state.isRunning || gameOverRef.current) return;
@@ -362,6 +405,7 @@ export const useGameLoop = (
         requestRef.current = requestAnimationFrame(update);
     };
 
+    /** Draws the current game state to the canvas: tiles, particles, paddles, and balls. */
     const render = () => {
         const canvas = canvasRef.current;
         if (!canvas) return;

@@ -1,8 +1,16 @@
-// Player Stats Service - Tracks wins, games played, and best scores
-// Uses localStorage with optional Supabase sync when table is created
+/**
+ * Player stats service — tracks wins, losses, best scores, and territory conquered.
+ *
+ * Stats are always persisted to localStorage so they work without auth.
+ * When a user is logged in, stats are synced to the Supabase `player_stats` table
+ * (silently fails if the table hasn't been created yet).
+ *
+ * On login, cloud and local stats are merged by taking the higher value for each field.
+ */
 
 import { supabase } from '../supabaseClient';
 
+/** Cumulative player statistics across all games. */
 export interface PlayerStats {
     gamesPlayed: number;
     wins: number;

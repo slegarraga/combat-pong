@@ -1,8 +1,14 @@
 {
-  "name": "pongy",
-  "private": true,
-  "version": "0.0.0",
+  "name": "combat-pong",
+  "version": "1.0.0",
+  "description": "A territory control game inspired by Pong Wars. Battle AI or play real-time multiplayer — conquer 50%+ of the board in 90 seconds to win.",
+  "license": "MIT",
   "type": "module",
+  "homepage": "https://combat-pong.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/slegarraga/combat-pong"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

@@ -1,3 +1,15 @@
+/**
+ * Main menu / home screen — the first thing players see.
+ *
+ * Displays:
+ *   - Game title and tagline
+ *   - Player stats (wins, win rate, best score) if any games have been played
+ *   - 4 difficulty buttons that launch single-player games
+ *   - Multiplayer "Find Match" button (requires Google login)
+ *   - Links to informational pages (How to Play, Tips, FAQ)
+ *   - Login/logout controls and credits footer
+ */
+
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { getLocalStats, getWinRate, type PlayerStats } from '../game/PlayerStats';

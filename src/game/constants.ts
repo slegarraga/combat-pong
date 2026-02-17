@@ -1,4 +1,11 @@
-// Core game constants
+/**
+ * Game constants — all tunable values that control the game's physics, visuals, and difficulty.
+ *
+ * The game board is a 600x600px canvas divided into a 24x24 grid of 25px tiles.
+ * Each tile is "owned" by either the Day (player) or Night (AI) team.
+ */
+
+// Canvas and grid dimensions
 export const CANVAS_SIZE = 600;
 export const TILE_SIZE = 25;
 export const GRID_WIDTH = CANVAS_SIZE / TILE_SIZE; // 24
@@ -15,29 +22,31 @@ export const MIN_SPEED = 6;
 export const BASE_ACCELERATION = 0.08;
 export const BALL_RADIUS = TILE_SIZE / 2;
 
-// Lives
-export const STARTING_LIVES = 3;
-
-// Theme colors - SUBTLE & ELEGANT palette
+// Theme colors
 export const COLORS = {
-    // Day team - warm cream/gold tones
-    day: '#F5E6D3',        // Warm cream
-    dayAccent: '#D4A574',  // Soft gold
-    dayBall: '#B8860B',    // Dark gold
+    // Day team (player) - warm cream/gold tones
+    day: '#F5E6D3',
+    dayAccent: '#D4A574',
+    dayBall: '#B8860B',
 
-    // Night team - cool slate/indigo tones  
-    night: '#2D3748',      // Slate gray
-    nightAccent: '#4A5568', // Medium slate
-    nightBall: '#667EEA',  // Soft indigo
+    // Night team (AI) - cool slate/indigo tones
+    night: '#2D3748',
+    nightAccent: '#4A5568',
+    nightBall: '#667EEA',
 
     // UI
     paddle: '#FFFFFF',
-    background: '#1A1A2E', // Deep navy
-    heart: '#E53E3E',      // Soft red for hearts
-    heartEmpty: '#4A5568', // Gray for lost hearts
+    background: '#1A1A2E',
 };
 
-// Difficulty modifiers
+/**
+ * Difficulty presets — each level controls how many ball pairs spawn,
+ * the overall speed multiplier, and how quickly the AI reacts.
+ *
+ * `ballMultiplier` — number of ball *pairs* (1 day + 1 night per pair)
+ * `speedMod`       — multiplied against base ball speed and physics constants
+ * `aiReaction`     — lerp factor per frame for AI paddle tracking (higher = faster)
+ */
 export const DIFFICULTY = {
     EASY: { ballMultiplier: 1, speedMod: 0.7, aiReaction: 0.03 },
     MEDIUM: { ballMultiplier: 1, speedMod: 1.0, aiReaction: 0.06 },

@@ -1,3 +1,14 @@
+/**
+ * Game UI component — wraps the HTML canvas and renders all HUD elements.
+ *
+ * Responsibilities:
+ *   - Hosts the <canvas> element and wires up mouse/touch input
+ *   - Displays the countdown timer, territory score bar, and streak indicator
+ *   - Shows pause and game-over overlays
+ *   - Records game results to localStorage (and optionally Supabase)
+ *   - Provides "Share to X" and "Play Again" buttons after each match
+ */
+
 import { useRef, useState, useEffect } from 'react';
 import { useGameLoop } from './GameLoop';
 import { CANVAS_SIZE, COLORS } from './constants';
@@ -7,6 +18,7 @@ import { recordGame, type PlayerStats } from './PlayerStats';
 interface GameCanvasProps {
     difficulty: 'EASY' | 'MEDIUM' | 'HARD' | 'NIGHTMARE';
     onBack?: () => void;
+    /** If provided, game results sync to Supabase under this user ID. */
     userId?: string;
 }
 
@@ -50,7 +62,7 @@ export const GameCanvas = ({ difficulty, onBack, userId }: GameCanvasProps) => {
     // Main share function
     const handleShare = async () => {
         setShareStatus('sharing');
-        await shareToTwitter({ dayPercent, difficulty, lives: 0, playerWon });
+        await shareToTwitter({ dayPercent, difficulty, playerWon });
         setShareStatus('idle');
     };
 

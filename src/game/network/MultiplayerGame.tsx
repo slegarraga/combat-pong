@@ -1,4 +1,14 @@
-// Real-time Multiplayer Game Component using Supabase Realtime
+/**
+ * Real-time multiplayer game component.
+ *
+ * Architecture: host/client over Supabase Realtime broadcast channels.
+ *   - The **host** runs physics locally and broadcasts the full game state each frame
+ *   - The **client** receives state updates and only sends paddle position back
+ *   - Both players render locally from the same state
+ *
+ * Win condition: first player to control 90%+ of territory wins instantly.
+ * Uses Hard difficulty speed (7.2 base) with 2 balls.
+ */
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';

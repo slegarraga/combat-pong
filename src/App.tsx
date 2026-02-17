@@ -1,3 +1,11 @@
+/**
+ * Root application component — handles routing and authentication state.
+ *
+ * Uses a simple URL-based router (no library) with `window.history.pushState`.
+ * Routes map to the main menu, game canvas, auth screen, multiplayer game,
+ * and ~40 SEO content pages.
+ */
+
 import { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient';
 import { Auth } from './components/Auth';

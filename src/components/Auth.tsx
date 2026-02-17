@@ -1,3 +1,8 @@
+/**
+ * Authentication screen — Google OAuth login via Supabase.
+ * Required for multiplayer matchmaking and cloud stat syncing.
+ */
+
 import { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { COLORS } from '../game/constants';

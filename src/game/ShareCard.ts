@@ -1,13 +1,23 @@
+/**
+ * Twitter/X sharing — generates a 1200x630 score card image and shares it.
+ *
+ * Flow:
+ *   1. `generateShareCard()` draws a score card onto an off-screen canvas
+ *   2. `uploadToSupabase()` uploads the PNG to the `share-cards` storage bucket
+ *   3. `shareToTwitter()` opens a Twitter intent URL with the image link and tweet text
+ *   4. Falls back to sharing the game URL if Supabase upload fails
+ */
+
 import { COLORS } from './constants';
 import { supabase } from '../supabaseClient';
 
 interface ShareCardData {
     dayPercent: number;
     difficulty: string;
-    lives: number;
     playerWon?: boolean;
 }
 
+/** Renders a 1200x630 Open Graph-sized score card as a PNG blob. */
 export const generateShareCard = async (data: ShareCardData): Promise<Blob> => {
     const canvas = document.createElement('canvas');
     canvas.width = 1200;
@@ -61,10 +71,10 @@ export const generateShareCard = async (data: ShareCardData): Promise<Blob> => {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
     ctx.fillText('TERRITORY CONTROLLED', canvas.width / 2, 440);
 
-    // Stats
+    // Difficulty badge
     ctx.font = 'bold 36px system-ui, -apple-system, sans-serif';
-    const livesText = data.lives > 0 ? '❤️'.repeat(data.lives) : '💀';
-    ctx.fillText(`${livesText}  •  ${data.difficulty}`, canvas.width / 2, 520);
+    const won = data.playerWon ?? data.dayPercent > 50;
+    ctx.fillText(`${won ? '🏆' : '💀'}  •  ${data.difficulty}`, canvas.width / 2, 520);
 
     // CTA
     ctx.font = 'bold 40px system-ui, -apple-system, sans-serif';
@@ -98,7 +108,6 @@ const uploadToSupabase = async (imageBlob: Blob): Promise<string | null> => {
             .from('share-cards')
             .getPublicUrl(filename);
 
-        console.log('Image uploaded:', urlData.publicUrl);
         return urlData.publicUrl;
     } catch (err) {
         console.error('Upload failed:', err);
@@ -106,6 +115,7 @@ const uploadToSupabase = async (imageBlob: Blob): Promise<string | null> => {
     }
 };
 
+/** Generates a score card, uploads it, and opens a Twitter intent window. */
 export const shareToTwitter = async (data: ShareCardData): Promise<'success' | 'fallback'> => {
     // Generate the image
     const imageBlob = await generateShareCard(data);
