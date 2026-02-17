@@ -4,7 +4,8 @@ A territory control game inspired by [Pong Wars](https://github.com/vnglst/pong-
 
 **[Play Now](https://www.combatpong.com)**
 
-<!-- TODO: drag combat-pong.mp4 into the GitHub README editor to embed gameplay video -->
+https://github.com/user-attachments/assets/9dca82f4-fb93-480a-9a50-d5a5e7a5b129
+
 
 ## How It Works
 
