@@ -4,7 +4,7 @@
   "description": "A territory control game inspired by Pong Wars. Battle AI or play real-time multiplayer — conquer 50%+ of the board in 90 seconds to win.",
   "license": "MIT",
   "type": "module",
-  "homepage": "https://combat-pong.vercel.app",
+  "homepage": "https://www.combatpong.com",
   "repository": {
     "type": "git",
     "url": "https://github.com/slegarraga/combat-pong"

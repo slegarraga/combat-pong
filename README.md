@@ -2,7 +2,7 @@
 
 A territory control game inspired by [Pong Wars](https://github.com/vnglst/pong-wars). Battle against AI or challenge friends in real-time multiplayer — conquer more than 50% of the board in 90 seconds to win.
 
-**[Play Now](https://combat-pong.vercel.app)**
+**[Play Now](https://www.combatpong.com)**
 
 ![Combat Pong](public/og-image.png)
 
