@@ -1,532 +1,866 @@
 /**
- * Core game loop — physics, collision detection, rendering, and input handling.
+ * Anonymous duel engine.
  *
- * Exposed as a React hook (`useGameLoop`) that owns the entire game lifecycle:
- *   1. Initializes the 24x24 territory grid (top half = Night, bottom half = Day)
- *   2. Spawns balls based on the chosen difficulty
- *   3. Runs a `requestAnimationFrame` loop that each frame:
- *      - Updates the AI paddle (tracks nearest incoming Day ball)
- *      - Checks paddle-ball collisions (triggers the streak system)
- *      - Detects ball-tile collisions (converts enemy tiles)
- *      - Enforces wall boundaries (miss penalty + streak reset)
- *      - Applies random micro-acceleration for unpredictable movement
- *      - Renders tiles, paddles, balls (with trails), and particles
- *   4. Ends the match after 90 seconds — whoever controls >50% wins
- *
- * Streak system:
- *   Every consecutive paddle hit adds +0.25x speed to that ball (cumulative).
- *   Missing a ball at the wall resets your streak to 0 and slows the ball by 15%.
- *
- * Visual effects:
- *   - Particle bursts on tile captures and paddle hits
- *   - Screen shake that scales with streak intensity
- *   - Ball trails rendered as faded ghost positions
+ * This hook owns the entire match lifecycle and keeps the imperative canvas
+ * work isolated from the React UI layer. The engine is deliberately split into
+ * small helpers so the feel can be tuned without threading side effects through
+ * one giant update function.
  */
 
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    CANVAS_SIZE, TILE_SIZE, GRID_WIDTH, GRID_HEIGHT,
-    MAX_SPEED, MIN_SPEED, BASE_ACCELERATION, COLORS, DIFFICULTY,
-    PADDLE_WIDTH, PADDLE_HEIGHT, PADDLE_OFFSET, BALL_RADIUS
+    BALL_RADIUS,
+    BASE_ACCELERATION,
+    CANVAS_SIZE,
+    COLORS,
+    DIFFICULTY,
+    GRID_HEIGHT,
+    GRID_WIDTH,
+    MATCH_DURATION,
+    MAX_SPEED,
+    MIN_SPEED,
+    PADDLE_HEIGHT,
+    PADDLE_OFFSET,
+    PADDLE_WIDTH,
+    TILE_SIZE,
+    TRAIL_LENGTH,
 } from './constants';
-import type { GameState, Ball, Team, Paddle } from './types';
+import { createRivalProfile, fluctuatePing, getRivalFeedLine } from './rivals';
+import type {
+    Ball,
+    Difficulty,
+    FeedEvent,
+    GameState,
+    ImpactRing,
+    Paddle,
+    RivalProfile,
+    ScoreSnapshot,
+    Team,
+} from './types';
 
-type Difficulty = 'EASY' | 'MEDIUM' | 'HARD' | 'NIGHTMARE';
-
-const MATCH_DURATION = 90; // seconds
-
-/** A short-lived visual particle emitted on impacts and tile captures. */
 interface Particle {
     x: number;
     y: number;
     vx: number;
     vy: number;
-    /** 1.0 → 0.0 over the particle's lifetime. Used as alpha. */
     life: number;
     color: string;
     size: number;
 }
 
-/**
- * React hook that runs the entire single-player game.
- * Returns reactive state (score, time, streak) and handlers for the UI layer.
- */
+const PLAYER_PADDLE_Y = CANVAS_SIZE - PADDLE_OFFSET - PADDLE_HEIGHT;
+const AI_PADDLE_Y = PADDLE_OFFSET;
+
+const clamp = (value: number, min: number, max: number) =>
+    Math.min(max, Math.max(min, value));
+
+const maybeRoundRect = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    radius: number,
+) => {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+};
+
+const nextFeedId = (() => {
+    let value = 0;
+    return () => {
+        value += 1;
+        return value;
+    };
+})();
+
 export const useGameLoop = (
     canvasRef: React.RefObject<HTMLCanvasElement>,
-    difficulty: Difficulty = 'MEDIUM'
+    difficulty: Difficulty = 'MEDIUM',
 ) => {
-    const requestRef = useRef<number>();
+    const requestRef = useRef<number | null>(null);
+    const updateRef = useRef<(currentTime: number) => void>(() => {});
     const stateRef = useRef<GameState | null>(null);
     const particlesRef = useRef<Particle[]>([]);
+    const ringsRef = useRef<ImpactRing[]>([]);
     const shakeRef = useRef({ x: 0, y: 0, intensity: 0 });
     const gameOverRef = useRef(false);
-    const startTimeRef = useRef<number>(0);
-    const lastTimeRef = useRef<number>(0);
-    const pauseTimeRef = useRef<number>(0); // Track when we paused
+    const startTimeRef = useRef(0);
+    const lastFrameRef = useRef(0);
+    const pauseTimeRef = useRef(0);
+    const lastNarrationRef = useRef(0);
+    const lastPingShiftRef = useRef(0);
+    const bestStreakRef = useRef(0);
+    const streakRef = useRef(0);
+    const scoreCacheRef = useRef<ScoreSnapshot>({ day: 0, night: 0 });
+    const timeCacheRef = useRef(MATCH_DURATION);
+    const phaseRef = useRef<'OPENING' | 'MIDGAME' | 'CLUTCH'>('OPENING');
+    const momentumRef = useRef(12);
+    const leadStateRef = useRef<'neutral' | 'player' | 'rival'>('neutral');
+    const feedRef = useRef<FeedEvent[]>([]);
+    const difficultyConfig = DIFFICULTY[difficulty];
 
-    const [score, setScore] = useState({ day: 0, night: 0 });
+    const [score, setScore] = useState<ScoreSnapshot>({ day: 0, night: 0 });
     const [timeRemaining, setTimeRemaining] = useState(MATCH_DURATION);
     const [isPaused, setIsPaused] = useState(false);
     const [gameOver, setGameOver] = useState(false);
     const [streak, setStreak] = useState(0);
-    const streakRef = useRef(0);
+    const [bestStreak, setBestStreak] = useState(0);
+    const [rival, setRival] = useState<RivalProfile>(() => createRivalProfile(difficulty));
+    const [feed, setFeed] = useState<FeedEvent[]>([]);
+    const [momentum, setMomentum] = useState(12);
+    const [phase, setPhase] = useState<'OPENING' | 'MIDGAME' | 'CLUTCH'>('OPENING');
+    const [pingMs, setPingMs] = useState(rival.pingMs);
 
-    const diffSettings = DIFFICULTY[difficulty];
+    const syncScore = (nextScore: ScoreSnapshot) => {
+        if (
+            nextScore.day !== scoreCacheRef.current.day ||
+            nextScore.night !== scoreCacheRef.current.night
+        ) {
+            scoreCacheRef.current = nextScore;
+            setScore(nextScore);
+        }
+    };
 
-    const emitParticles = (x: number, y: number, color: string, count: number = 8) => {
-        for (let i = 0; i < count; i++) {
-            const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
-            const speed = 2 + Math.random() * 4;
+    const syncTime = (nextTime: number) => {
+        if (nextTime !== timeCacheRef.current) {
+            timeCacheRef.current = nextTime;
+            setTimeRemaining(nextTime);
+        }
+    };
+
+    const pushFeed = useCallback((text: string, tone: FeedEvent['tone'] = 'neutral') => {
+        const nextFeed = [{ id: nextFeedId(), text, tone }, ...feedRef.current].slice(0, 4);
+        feedRef.current = nextFeed;
+        setFeed(nextFeed);
+    }, []);
+
+    const updateFeedRef = useRef(pushFeed);
+    updateFeedRef.current = pushFeed;
+
+    const narrate = (text: string, tone: FeedEvent['tone'] = 'neutral', minGap = 900) => {
+        const now = performance.now();
+        if (now - lastNarrationRef.current < minGap) return;
+        lastNarrationRef.current = now;
+        updateFeedRef.current(text, tone);
+    };
+
+    const emitParticles = (x: number, y: number, color: string, count = 8) => {
+        for (let index = 0; index < count; index += 1) {
+            const angle = (Math.PI * 2 * index) / count + Math.random() * 0.45;
+            const speed = 1.8 + Math.random() * 3.8;
             particlesRef.current.push({
-                x, y,
+                x,
+                y,
                 vx: Math.cos(angle) * speed,
                 vy: Math.sin(angle) * speed,
-                life: 1.0,
+                life: 1,
                 color,
-                size: 3 + Math.random() * 4
+                size: 2 + Math.random() * 4,
             });
         }
     };
 
-    const triggerShake = (intensity: number = 5) => {
-        shakeRef.current.intensity = intensity;
+    const emitRing = (x: number, y: number, color: string, growth = 3.8) => {
+        ringsRef.current.push({
+            x,
+            y,
+            radius: 6,
+            alpha: 0.72,
+            growth,
+            color,
+        });
     };
 
-    const updateParticles = () => {
-        const particles = particlesRef.current;
-        for (let i = particles.length - 1; i >= 0; i--) {
-            const p = particles[i];
-            p.x += p.vx;
-            p.y += p.vy;
-            p.life -= 0.03;
-            p.size *= 0.95;
-            p.vy += 0.1;
-            if (p.life <= 0) particles.splice(i, 1);
-        }
-    };
-
-    const updateShake = () => {
-        const shake = shakeRef.current;
-        if (shake.intensity > 0) {
-            shake.x = (Math.random() - 0.5) * shake.intensity;
-            shake.y = (Math.random() - 0.5) * shake.intensity;
-            shake.intensity *= 0.9;
-            if (shake.intensity < 0.1) shake.intensity = 0;
-        } else {
-            shake.x = 0;
-            shake.y = 0;
-        }
+    const triggerShake = (intensity = 4) => {
+        shakeRef.current.intensity = Math.max(shakeRef.current.intensity, intensity);
     };
 
     const initOwnership = (): Team[] => {
         const ownership: Team[] = [];
-        for (let i = 0; i < GRID_WIDTH * GRID_HEIGHT; i++) {
-            const row = Math.floor(i / GRID_WIDTH);
+        for (let index = 0; index < GRID_WIDTH * GRID_HEIGHT; index += 1) {
+            const row = Math.floor(index / GRID_WIDTH);
             ownership.push(row < GRID_HEIGHT / 2 ? 'night' : 'day');
         }
         return ownership;
     };
 
-    const createBalls = (): Ball[] => {
-        const balls: Ball[] = [];
-        const count = diffSettings.ballMultiplier;
-        const speed = 6 * diffSettings.speedMod;
+    const createBall = useCallback((team: Team, pairIndex: number): Ball => {
+        const speed = 5.6 * difficultyConfig.speedMod;
+        return {
+            id: `${team}-${pairIndex}-${Math.random().toString(36).slice(2, 8)}`,
+            x: CANVAS_SIZE * (0.28 + Math.random() * 0.44),
+            y: team === 'day'
+                ? CANVAS_SIZE * 0.75 + (Math.random() - 0.5) * 38
+                : CANVAS_SIZE * 0.25 + (Math.random() - 0.5) * 38,
+            vx: speed * (Math.random() > 0.5 ? 1 : -1),
+            vy: team === 'day' ? -speed : speed,
+            team,
+            speedMultiplier: 1,
+            trail: [],
+        };
+    }, [difficultyConfig.speedMod]);
 
-        for (let i = 0; i < count; i++) {
-            balls.push({
-                x: CANVAS_SIZE / 4 + Math.random() * (CANVAS_SIZE / 2),
-                y: CANVAS_SIZE * 0.75 + (Math.random() - 0.5) * 50,
-                vx: speed * (Math.random() > 0.5 ? 1 : -1),
-                vy: -speed,
-                team: 'day',
-                speedMultiplier: 1.0
-            });
-            balls.push({
-                x: CANVAS_SIZE / 4 + Math.random() * (CANVAS_SIZE / 2),
-                y: CANVAS_SIZE * 0.25 + (Math.random() - 0.5) * 50,
-                vx: speed * (Math.random() > 0.5 ? 1 : -1),
-                vy: speed,
-                team: 'night',
-                speedMultiplier: 1.0
-            });
+    const createBalls = useCallback(() => {
+        const balls: Ball[] = [];
+        for (let pairIndex = 0; pairIndex < difficultyConfig.ballPairs; pairIndex += 1) {
+            balls.push(createBall('day', pairIndex));
+            balls.push(createBall('night', pairIndex));
         }
         return balls;
+    }, [createBall, difficultyConfig.ballPairs]);
+
+    const predictLandingX = (ball: Ball, targetY: number) => {
+        const distance = Math.abs(targetY - ball.y);
+        const travelFrames = distance / Math.max(Math.abs(ball.vy), 0.001);
+        let projected = ball.x + ball.vx * travelFrames;
+
+        while (projected < 0 || projected > CANVAS_SIZE) {
+            if (projected < 0) projected = Math.abs(projected);
+            if (projected > CANVAS_SIZE) projected = CANVAS_SIZE - (projected - CANVAS_SIZE);
+        }
+
+        return projected;
     };
 
-    const initGame = useCallback(() => {
-        stateRef.current = {
-            ownership: initOwnership(),
-            balls: createBalls(),
-            playerPaddle: { x: CANVAS_SIZE / 2 - PADDLE_WIDTH / 2, width: PADDLE_WIDTH, height: PADDLE_HEIGHT },
-            aiPaddle: { x: CANVAS_SIZE / 2 - PADDLE_WIDTH / 2, width: PADDLE_WIDTH, height: PADDLE_HEIGHT },
-            dayScore: 0,
-            nightScore: 0,
-            isRunning: true,
-            dayColor: COLORS.day,
-            nightColor: COLORS.night,
-        };
-        particlesRef.current = [];
-        shakeRef.current = { x: 0, y: 0, intensity: 0 };
-        gameOverRef.current = false;
-        startTimeRef.current = performance.now();
-        lastTimeRef.current = performance.now();
+    const updateParticles = (delta: number) => {
+        for (let index = particlesRef.current.length - 1; index >= 0; index -= 1) {
+            const particle = particlesRef.current[index];
+            particle.x += particle.vx * delta;
+            particle.y += particle.vy * delta;
+            particle.life -= 0.04 * delta;
+            particle.size *= 0.97;
+            particle.vy += 0.08 * delta;
+
+            if (particle.life <= 0) {
+                particlesRef.current.splice(index, 1);
+            }
+        }
+
+        for (let index = ringsRef.current.length - 1; index >= 0; index -= 1) {
+            const ring = ringsRef.current[index];
+            ring.radius += ring.growth * delta;
+            ring.alpha -= 0.06 * delta;
+
+            if (ring.alpha <= 0) {
+                ringsRef.current.splice(index, 1);
+            }
+        }
+    };
+
+    const updateShake = () => {
+        if (shakeRef.current.intensity <= 0.08) {
+            shakeRef.current = { x: 0, y: 0, intensity: 0 };
+            return;
+        }
+
+        shakeRef.current.x = (Math.random() - 0.5) * shakeRef.current.intensity;
+        shakeRef.current.y = (Math.random() - 0.5) * shakeRef.current.intensity;
+        shakeRef.current.intensity *= 0.87;
+    };
+
+    const updateMomentum = (state: GameState, remaining: number, currentTime: number) => {
+        const lead = state.dayScore - state.nightScore;
+        const nextPhase = remaining > 60 ? 'OPENING' : remaining > 24 ? 'MIDGAME' : 'CLUTCH';
+
+        if (nextPhase !== phaseRef.current) {
+            phaseRef.current = nextPhase;
+            setPhase(nextPhase);
+            if (nextPhase === 'CLUTCH') {
+                narrate(getRivalFeedLine(state.rival, 'clutch'), 'warning', 0);
+            }
+        }
+
+        const nextMomentum = clamp(
+            Math.round(18 + Math.abs(lead) / 6 + streakRef.current * 10 + (nextPhase === 'CLUTCH' ? 14 : 0)),
+            0,
+            100,
+        );
+
+        if (nextMomentum !== momentumRef.current) {
+            momentumRef.current = nextMomentum;
+            setMomentum(nextMomentum);
+        }
+
+        if (lead > 34 && leadStateRef.current !== 'player') {
+            leadStateRef.current = 'player';
+            narrate(getRivalFeedLine(state.rival, 'playerLead'), 'positive', 0);
+        } else if (lead < -34 && leadStateRef.current !== 'rival') {
+            leadStateRef.current = 'rival';
+            narrate(getRivalFeedLine(state.rival, 'rivalLead'), 'warning', 0);
+        } else if (Math.abs(lead) < 10 && leadStateRef.current !== 'neutral') {
+            leadStateRef.current = 'neutral';
+            narrate(getRivalFeedLine(state.rival, 'pressure'), 'neutral', 1100);
+        }
+
+        if (currentTime - lastPingShiftRef.current > 2500) {
+            lastPingShiftRef.current = currentTime;
+            state.rival.pingMs = fluctuatePing(state.rival, difficulty);
+            setPingMs(state.rival.pingMs);
+        }
+    };
+
+    const recomputeScore = (ownership: Team[]) => {
+        let day = 0;
+        let night = 0;
+
+        for (const team of ownership) {
+            if (team === 'day') day += 1;
+            else night += 1;
+        }
+
+        return { day, night };
+    };
+
+    const updateBallTrail = (ball: Ball) => {
+        ball.trail.unshift({ x: ball.x, y: ball.y, alpha: 1 });
+        if (ball.trail.length > TRAIL_LENGTH) {
+            ball.trail.length = TRAIL_LENGTH;
+        }
+
+        ball.trail.forEach((point, index) => {
+            point.alpha = 1 - index / TRAIL_LENGTH;
+        });
+    };
+
+    const awardPlayerStreak = (state: GameState, ball: Ball) => {
+        streakRef.current += 1;
+        bestStreakRef.current = Math.max(bestStreakRef.current, streakRef.current);
+        setStreak(streakRef.current);
+        setBestStreak(bestStreakRef.current);
+
+        ball.speedMultiplier = clamp(1 + streakRef.current * 0.16, 1, 2.8);
+
+        if ([3, 6, 9].includes(streakRef.current)) {
+            narrate(getRivalFeedLine(state.rival, 'pressure'), 'positive', 0);
+        }
+    };
+
+    const resetPlayerStreak = (state: GameState) => {
+        if (streakRef.current === 0) return;
         streakRef.current = 0;
         setStreak(0);
-        setTimeRemaining(MATCH_DURATION);
-        setIsPaused(false);
-        setGameOver(false);
-    }, [difficulty]);
+        narrate(getRivalFeedLine(state.rival, 'reset'), 'warning', 0);
+    };
 
-    /**
-     * AABB collision test between a ball and a paddle.
-     * On hit: increments streak, boosts ball speed, applies angle deflection.
-     * `bounceDirection` is -1 (bounce up from player paddle) or +1 (bounce down from AI paddle).
-     */
-    const checkPaddleCollision = (ball: Ball, paddle: Paddle, paddleY: number, bounceDirection: number) => {
+    const applyPaddleReturn = (
+        state: GameState,
+        ball: Ball,
+        paddle: Paddle,
+        bounceDirection: number,
+        owner: 'player' | 'rival',
+    ) => {
+        const hitOffset = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+        const paddleInfluence = paddle.velocity * 0.08;
+        const spin = hitOffset * (owner === 'player' ? 7.2 : 5.8) + paddleInfluence;
+        const currentSpeed = Math.hypot(ball.vx, ball.vy);
+        const speedBoost = owner === 'player' ? 0.45 + Math.abs(hitOffset) * 0.45 : 0.24;
+
+        if (owner === 'player') {
+            awardPlayerStreak(state, ball);
+        } else {
+            ball.speedMultiplier = clamp(ball.speedMultiplier * (1 + state.rival.aggression * 0.03), 1, 2.2);
+        }
+
+        const targetSpeed = clamp(
+            currentSpeed + speedBoost,
+            MIN_SPEED * difficultyConfig.speedMod,
+            MAX_SPEED * difficultyConfig.speedMod * ball.speedMultiplier,
+        );
+
+        ball.vx = ball.vx * 0.32 + spin;
+        ball.vy = bounceDirection * targetSpeed;
+        const normalized = Math.hypot(ball.vx, ball.vy) || 1;
+        const ratio = targetSpeed / normalized;
+        ball.vx *= ratio;
+        ball.vy *= ratio;
+
+        const effectColor = ball.team === 'day' ? COLORS.dayAccent : COLORS.nightAccent;
+        triggerShake(owner === 'player' ? 7 + Math.min(streakRef.current, 6) : 4);
+        emitParticles(ball.x, ball.y, effectColor, owner === 'player' ? 10 + streakRef.current : 7);
+        emitRing(ball.x, ball.y, effectColor, owner === 'player' ? 4.6 : 3.6);
+    };
+
+    const checkPaddleCollision = (
+        state: GameState,
+        ball: Ball,
+        paddle: Paddle,
+        paddleY: number,
+        bounceDirection: number,
+        owner: 'player' | 'rival',
+    ) => {
         const ballTop = ball.y - BALL_RADIUS;
         const ballBottom = ball.y + BALL_RADIUS;
         const ballLeft = ball.x - BALL_RADIUS;
         const ballRight = ball.x + BALL_RADIUS;
 
-        if (
+        const hit =
             ballRight > paddle.x &&
             ballLeft < paddle.x + paddle.width &&
             ballBottom > paddleY &&
-            ballTop < paddleY + paddle.height
-        ) {
-            // STREAK SYSTEM: Each paddle hit = +0.25x speed boost (cumulative!)
-            streakRef.current += 1;
-            setStreak(streakRef.current);
+            ballTop < paddleY + paddle.height;
 
-            // Each hit: 1.0 + (streak * 0.25) = 1st hit 1.25x, 2nd hit 1.5x, 3rd hit 1.75x...
-            const newSpeedMultiplier = 1.0 + (streakRef.current * 0.25);
-            ball.speedMultiplier = newSpeedMultiplier; // Persist on the ball!
+        if (!hit) return false;
 
-            triggerShake(6 + Math.min(streakRef.current * 2, 10));
-            emitParticles(ball.x, ball.y, ball.team === 'day' ? COLORS.dayAccent : COLORS.nightAccent, 10 + streakRef.current * 3);
+        ball.y = owner === 'player'
+            ? paddleY - BALL_RADIUS - 1
+            : paddleY + paddle.height + BALL_RADIUS + 1;
 
-            // DYNAMIC DIRECTION: More unpredictable bounce angles!
-            const hitPoint = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
-            const randomSpin = (Math.random() - 0.5) * 3; // Random spin effect
-            const velocityInfluence = ball.vx * 0.15; // Current velocity affects angle
-            const maxAngleDeflection = 8 + streakRef.current; // Higher streak = wilder deflections
-
-            ball.vx += hitPoint * maxAngleDeflection + randomSpin + velocityInfluence;
-            ball.vy = bounceDirection * Math.abs(ball.vy) * newSpeedMultiplier;
-
-            // Allow streak to push beyond normal max speed! Cap scales with streak
-            const streakMaxSpeed = MAX_SPEED * diffSettings.speedMod * newSpeedMultiplier;
-            const speed = Math.sqrt(ball.vx ** 2 + ball.vy ** 2);
-            if (speed > streakMaxSpeed) {
-                const scale = streakMaxSpeed / speed;
-                ball.vx *= scale;
-                ball.vy *= scale;
-            }
-            return true;
-        }
-        return false;
+        applyPaddleReturn(state, ball, paddle, bounceDirection, owner);
+        return true;
     };
 
-    /** Scans the grid for an enemy tile overlapping the ball and converts it. */
     const detectTileCollision = (ball: Ball, ownership: Team[]) => {
-        const halfTile = TILE_SIZE / 2;
         const enemyTeam: Team = ball.team === 'day' ? 'night' : 'day';
+        const minCol = clamp(Math.floor((ball.x - BALL_RADIUS) / TILE_SIZE), 0, GRID_WIDTH - 1);
+        const maxCol = clamp(Math.floor((ball.x + BALL_RADIUS) / TILE_SIZE), 0, GRID_WIDTH - 1);
+        const minRow = clamp(Math.floor((ball.y - BALL_RADIUS) / TILE_SIZE), 0, GRID_HEIGHT - 1);
+        const maxRow = clamp(Math.floor((ball.y + BALL_RADIUS) / TILE_SIZE), 0, GRID_HEIGHT - 1);
 
-        for (let row = 0; row < GRID_HEIGHT; row++) {
-            for (let col = 0; col < GRID_WIDTH; col++) {
-                const idx = col + row * GRID_WIDTH;
-                const tileX = col * TILE_SIZE;
-                const tileY = row * TILE_SIZE;
+        for (let row = minRow; row <= maxRow; row += 1) {
+            for (let col = minCol; col <= maxCol; col += 1) {
+                const index = col + row * GRID_WIDTH;
+                if (ownership[index] !== enemyTeam) continue;
 
-                if (
-                    ball.x + halfTile > tileX &&
-                    ball.x - halfTile < tileX + TILE_SIZE &&
-                    ball.y + halfTile > tileY &&
-                    ball.y - halfTile < tileY + TILE_SIZE &&
-                    ownership[idx] === enemyTeam
-                ) {
-                    ownership[idx] = ball.team;
-                    emitParticles(tileX + TILE_SIZE / 2, tileY + TILE_SIZE / 2,
-                        ball.team === 'day' ? COLORS.dayAccent : COLORS.nightAccent, 4);
+                ownership[index] = ball.team;
+                const tileCenterX = col * TILE_SIZE + TILE_SIZE / 2;
+                const tileCenterY = row * TILE_SIZE + TILE_SIZE / 2;
+                const dx = ball.x - tileCenterX;
+                const dy = ball.y - tileCenterY;
 
-                    const dx = ball.x - (tileX + TILE_SIZE / 2);
-                    const dy = ball.y - (tileY + TILE_SIZE / 2);
-                    if (Math.abs(dx) > Math.abs(dy)) ball.vx = -ball.vx;
-                    else ball.vy = -ball.vy;
-                    return;
+                emitParticles(
+                    tileCenterX,
+                    tileCenterY,
+                    ball.team === 'day' ? COLORS.dayAccent : COLORS.nightAccent,
+                    4 + Math.round(ball.speedMultiplier * 2),
+                );
+                emitRing(tileCenterX, tileCenterY, ball.team === 'day' ? COLORS.dayAccent : COLORS.nightAccent, 2.8);
+
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    ball.vx *= -1;
+                } else {
+                    ball.vy *= -1;
                 }
+                return;
             }
         }
     };
 
-    /**
-     * Wall boundary checks. All four walls bounce the ball.
-     * Missing your own ball at the bottom/top wall triggers a miss penalty:
-     * streak resets to 0, speed multiplier resets, and ball slows by 15%.
-     */
-    const checkBoundaries = (ball: Ball): void => {
-        // Left/Right walls - bounce
-        if (ball.x < BALL_RADIUS || ball.x > CANVAS_SIZE - BALL_RADIUS) {
-            ball.vx = -ball.vx;
-            ball.x = Math.max(BALL_RADIUS, Math.min(CANVAS_SIZE - BALL_RADIUS, ball.x));
-            triggerShake(2);
+    const handleBoundaryMiss = (state: GameState, ball: Ball, owner: 'player' | 'rival') => {
+        ball.speedMultiplier = 1;
+        ball.vx *= 0.86;
+        ball.vy *= 0.86;
+
+        if (owner === 'player') {
+            resetPlayerStreak(state);
+            triggerShake(9);
+            emitParticles(ball.x, ball.y, COLORS.danger, 9);
+        } else {
+            triggerShake(5);
+            emitParticles(ball.x, ball.y, COLORS.nightAccent, 7);
+            narrate(`${state.rival.alias} lost a clean read.`, 'positive', 0);
+        }
+        emitRing(ball.x, ball.y, owner === 'player' ? COLORS.danger : COLORS.nightAccent, 4.4);
+    };
+
+    const checkBoundaries = (state: GameState, ball: Ball) => {
+        if (ball.x <= BALL_RADIUS || ball.x >= CANVAS_SIZE - BALL_RADIUS) {
+            ball.vx *= -1;
+            ball.x = clamp(ball.x, BALL_RADIUS, CANVAS_SIZE - BALL_RADIUS);
+            triggerShake(2.4);
         }
 
-        // TOP wall - AI MISSED! Night balls get penalty too (fair play!)
-        if (ball.y < BALL_RADIUS) {
+        if (ball.y <= BALL_RADIUS) {
             if (ball.team === 'night') {
-                // Night ball = AI's ball, AI missed it! Reset their speed too!
-                ball.speedMultiplier = 1.0; // Reset speed multiplier on miss!
-                ball.vx *= 0.85;
-                ball.vy *= 0.85;
-                triggerShake(4);
-                emitParticles(ball.x, ball.y, '#3b82f6', 6); // Blue particles for AI miss
-            } else {
-                triggerShake(2);
+                handleBoundaryMiss(state, ball, 'rival');
             }
             ball.vy = Math.abs(ball.vy);
-            ball.y = BALL_RADIUS + 5;
+            ball.y = BALL_RADIUS + 3;
         }
 
-        // BOTTOM wall - you MISSED! Ball slows down (0.85x penalty) + STREAK RESET!
-        if (ball.y > CANVAS_SIZE - BALL_RADIUS) {
+        if (ball.y >= CANVAS_SIZE - BALL_RADIUS) {
             if (ball.team === 'day') {
-                // Day ball = YOUR ball, you missed it! Streak resets!
-                streakRef.current = 0;
-                setStreak(0);
-                ball.speedMultiplier = 1.0; // Reset speed multiplier on miss!
-                ball.vx *= 0.85;
-                ball.vy *= 0.85;
-                triggerShake(8);
-                emitParticles(ball.x, ball.y, '#ef4444', 6); // Red = bad
-            } else {
-                triggerShake(2);
+                handleBoundaryMiss(state, ball, 'player');
             }
             ball.vy = -Math.abs(ball.vy);
-            ball.y = CANVAS_SIZE - BALL_RADIUS - 5;
+            ball.y = CANVAS_SIZE - BALL_RADIUS - 3;
         }
     };
 
-    /** Applies random micro-acceleration and enforces speed limits, then moves the ball. */
-    const updateBallPhysics = (ball: Ball) => {
-        const accel = BASE_ACCELERATION * diffSettings.speedMod;
-        ball.vx += (Math.random() - 0.5) * accel;
-        ball.vy += (Math.random() - 0.5) * accel * 0.5;
+    const updateBallPhysics = (ball: Ball, delta: number) => {
+        const acceleration = BASE_ACCELERATION * difficultyConfig.speedMod;
+        ball.vx += (Math.random() - 0.5) * acceleration * delta;
+        ball.vy += (Math.random() - 0.5) * acceleration * 0.55 * delta;
 
-        const speed = Math.sqrt(ball.vx ** 2 + ball.vy ** 2);
-        // RESPECT the ball's streak multiplier! Don't cap streak-boosted balls!
-        const ballMultiplier = ball.speedMultiplier || 1.0;
-        const maxSpd = MAX_SPEED * diffSettings.speedMod * ballMultiplier;
-        const minSpd = MIN_SPEED * diffSettings.speedMod;
+        const speed = Math.hypot(ball.vx, ball.vy) || 1;
+        const maxSpeed = MAX_SPEED * difficultyConfig.speedMod * ball.speedMultiplier;
+        const minSpeed = MIN_SPEED * difficultyConfig.speedMod;
 
-        if (speed > maxSpd) {
-            const scale = maxSpd / speed;
+        if (speed > maxSpeed) {
+            const scale = maxSpeed / speed;
             ball.vx *= scale;
             ball.vy *= scale;
-        }
-        if (speed < minSpd) {
-            const scale = minSpd / speed;
+        } else if (speed < minSpeed) {
+            const scale = minSpeed / speed;
             ball.vx *= scale;
             ball.vy *= scale;
         }
 
-        ball.x += ball.vx;
-        ball.y += ball.vy;
+        ball.x += ball.vx * delta;
+        ball.y += ball.vy * delta;
+        updateBallTrail(ball);
     };
 
-    /** AI paddle controller — lerps toward the nearest incoming Day ball. */
-    const updateAI = (state: GameState) => {
+    const updateAI = (state: GameState, delta: number, currentTime: number) => {
         const aiPaddle = state.aiPaddle;
-        const threats = state.balls.filter(b => b.team === 'day' && b.vy < 0).sort((a, b) => a.y - b.y);
-        const target = threats[0];
-        if (target) {
-            const targetX = target.x - aiPaddle.width / 2;
-            aiPaddle.x += (targetX - aiPaddle.x) * diffSettings.aiReaction;
-        }
-        aiPaddle.x = Math.max(0, Math.min(CANVAS_SIZE - aiPaddle.width, aiPaddle.x));
-    };
+        const incomingDayBalls = state.balls
+            .filter((ball) => ball.team === 'day' && ball.vy < 0)
+            .sort((left, right) => left.y - right.y);
 
-    /** Main update tick — called once per animation frame. */
-    const update = (currentTime: number) => {
-        const state = stateRef.current;
-        if (!state || !state.isRunning || gameOverRef.current) return;
+        let targetX = CANVAS_SIZE / 2 - aiPaddle.width / 2;
+        if (incomingDayBalls[0]) {
+            const threat = incomingDayBalls[0];
+            const projected = predictLandingX(threat, AI_PADDLE_Y + PADDLE_HEIGHT);
+            const aggressionBias = (state.rival.aggression - 0.5) * 26 * Math.sign(threat.vx || 1);
+            const wobble =
+                Math.sin(currentTime / (150 + state.rival.feintWindow * 4)) * state.rival.wobble +
+                (Math.random() - 0.5) * (1 - state.rival.precision) * 16;
 
-        // Calculate elapsed time and remaining time
-        const elapsed = (currentTime - startTimeRef.current) / 1000;
-        const remaining = Math.max(0, MATCH_DURATION - elapsed);
-        setTimeRemaining(Math.ceil(remaining));
-
-        // Check if time is up
-        if (remaining <= 0) {
-            gameOverRef.current = true;
-            setGameOver(true);
-            state.isRunning = false;
-            triggerShake(10);
-
-            // Emit celebration particles for winner
-            const winner = state.dayScore > state.nightScore ? 'day' : 'night';
-            for (let i = 0; i < 5; i++) {
-                emitParticles(
-                    CANVAS_SIZE * Math.random(),
-                    CANVAS_SIZE * Math.random(),
-                    winner === 'day' ? COLORS.dayAccent : COLORS.nightAccent,
-                    15
-                );
-            }
-            return;
+            targetX = projected - aiPaddle.width / 2 + aggressionBias + wobble;
         }
 
-        updateAI(state);
-        updateParticles();
-        updateShake();
-
-        state.balls.forEach(ball => {
-            const playerPaddleY = CANVAS_SIZE - PADDLE_OFFSET - PADDLE_HEIGHT;
-            if (ball.vy > 0) checkPaddleCollision(ball, state.playerPaddle, playerPaddleY, -1);
-
-            const aiPaddleY = PADDLE_OFFSET;
-            if (ball.vy < 0) checkPaddleCollision(ball, state.aiPaddle, aiPaddleY, 1);
-
-            detectTileCollision(ball, state.ownership);
-            checkBoundaries(ball);
-            updateBallPhysics(ball);
-        });
-
-        let dayCount = 0, nightCount = 0;
-        state.ownership.forEach(team => {
-            if (team === 'day') dayCount++;
-            else nightCount++;
-        });
-        state.dayScore = dayCount;
-        state.nightScore = nightCount;
-        setScore({ day: dayCount, night: nightCount });
-
-        render();
-        requestRef.current = requestAnimationFrame(update);
+        const reactionBoost = phaseRef.current === 'CLUTCH' ? 1.15 : 1;
+        const desiredX = clamp(targetX, 0, CANVAS_SIZE - aiPaddle.width);
+        const previousX = aiPaddle.x;
+        aiPaddle.x += (desiredX - aiPaddle.x) * state.rival.reaction * reactionBoost * delta;
+        aiPaddle.x = clamp(aiPaddle.x, 0, CANVAS_SIZE - aiPaddle.width);
+        aiPaddle.velocity = aiPaddle.x - previousX;
     };
 
-    /** Draws the current game state to the canvas: tiles, particles, paddles, and balls. */
     const render = () => {
         const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        if (!ctx || !stateRef.current) return;
-
         const state = stateRef.current;
-        const shake = shakeRef.current;
+        if (!canvas || !state) return;
 
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
         ctx.save();
-        ctx.translate(shake.x, shake.y);
-        ctx.clearRect(-10, -10, CANVAS_SIZE + 20, CANVAS_SIZE + 20);
+        ctx.translate(shakeRef.current.x, shakeRef.current.y);
 
-        // Tiles
-        for (let row = 0; row < GRID_HEIGHT; row++) {
-            for (let col = 0; col < GRID_WIDTH; col++) {
-                const idx = col + row * GRID_WIDTH;
-                ctx.fillStyle = state.ownership[idx] === 'day' ? state.dayColor : state.nightColor;
-                ctx.fillRect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-            }
+        const boardFill = ctx.createLinearGradient(0, 0, 0, CANVAS_SIZE);
+        boardFill.addColorStop(0, COLORS.backgroundElevated);
+        boardFill.addColorStop(1, COLORS.background);
+        ctx.fillStyle = boardFill;
+        ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+        ctx.strokeStyle = COLORS.gridLine;
+        ctx.lineWidth = 1;
+        for (let column = 0; column <= GRID_WIDTH; column += 1) {
+            const x = column * TILE_SIZE;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, CANVAS_SIZE);
+            ctx.stroke();
+        }
+        for (let row = 0; row <= GRID_HEIGHT; row += 1) {
+            const y = row * TILE_SIZE;
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(CANVAS_SIZE, y);
+            ctx.stroke();
         }
 
-        // Particles
-        particlesRef.current.forEach(p => {
-            ctx.globalAlpha = p.life;
-            ctx.fillStyle = p.color;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-            ctx.fill();
-        });
+        ctx.strokeStyle = COLORS.centerLine;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, CANVAS_SIZE / 2);
+        ctx.lineTo(CANVAS_SIZE, CANVAS_SIZE / 2);
+        ctx.stroke();
+
+        for (let row = 0; row < GRID_HEIGHT; row += 1) {
+            for (let column = 0; column < GRID_WIDTH; column += 1) {
+                const index = column + row * GRID_WIDTH;
+                const owner = state.ownership[index];
+                ctx.fillStyle = owner === 'day' ? COLORS.day : COLORS.night;
+                ctx.globalAlpha = owner === 'day' ? 0.92 : 0.94;
+                ctx.fillRect(column * TILE_SIZE + 1, row * TILE_SIZE + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+            }
+        }
         ctx.globalAlpha = 1;
 
-        // Paddles
-        ctx.shadowBlur = 15;
-        ctx.fillStyle = '#FFFFFF';
+        for (const ring of ringsRef.current) {
+            ctx.strokeStyle = ring.color;
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = ring.alpha;
+            ctx.beginPath();
+            ctx.arc(ring.x, ring.y, ring.radius, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        for (const particle of particlesRef.current) {
+            ctx.globalAlpha = particle.life;
+            ctx.fillStyle = particle.color;
+            ctx.beginPath();
+            ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+
+        ctx.shadowBlur = 20;
         ctx.shadowColor = COLORS.dayAccent;
-        ctx.beginPath();
-        ctx.roundRect(state.playerPaddle.x, CANVAS_SIZE - PADDLE_OFFSET - PADDLE_HEIGHT, PADDLE_WIDTH, PADDLE_HEIGHT, 6);
+        ctx.fillStyle = COLORS.paddle;
+        maybeRoundRect(ctx, state.playerPaddle.x, PLAYER_PADDLE_Y, state.playerPaddle.width, state.playerPaddle.height, 8);
         ctx.fill();
 
-        ctx.shadowColor = COLORS.nightBall;
-        ctx.beginPath();
-        ctx.roundRect(state.aiPaddle.x, PADDLE_OFFSET, PADDLE_WIDTH, PADDLE_HEIGHT, 6);
+        ctx.shadowColor = COLORS.nightAccent;
+        maybeRoundRect(ctx, state.aiPaddle.x, AI_PADDLE_Y, state.aiPaddle.width, state.aiPaddle.height, 8);
         ctx.fill();
         ctx.shadowBlur = 0;
 
-        // Balls with trails
-        ctx.shadowBlur = 20;
-        state.balls.forEach(ball => {
+        for (const ball of state.balls) {
             const ballColor = ball.team === 'day' ? COLORS.dayBall : COLORS.nightBall;
+            ctx.shadowBlur = 24;
             ctx.shadowColor = ballColor;
-            ctx.fillStyle = ballColor;
 
-            // Trail
-            ctx.globalAlpha = 0.3;
-            ctx.beginPath();
-            ctx.arc(ball.x - ball.vx * 2, ball.y - ball.vy * 2, BALL_RADIUS * 0.7, 0, Math.PI * 2);
-            ctx.fill();
+            ball.trail.forEach((point, index) => {
+                ctx.globalAlpha = point.alpha * 0.35;
+                ctx.fillStyle = ballColor;
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, BALL_RADIUS * (1 - index * 0.08), 0, Math.PI * 2);
+                ctx.fill();
+            });
 
-            ctx.globalAlpha = 0.6;
-            ctx.beginPath();
-            ctx.arc(ball.x - ball.vx, ball.y - ball.vy, BALL_RADIUS * 0.85, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Main ball
             ctx.globalAlpha = 1;
+            ctx.fillStyle = ballColor;
             ctx.beginPath();
             ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI * 2);
             ctx.fill();
-        });
-        ctx.shadowBlur = 0;
+        }
 
         ctx.restore();
     };
 
-    const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-        if (!canvasRef.current || !stateRef.current || gameOverRef.current) return;
-        const rect = canvasRef.current.getBoundingClientRect();
-        const scaleX = CANVAS_SIZE / rect.width;
-        const mouseX = (e.clientX - rect.left) * scaleX;
-        stateRef.current.playerPaddle.x = Math.max(0, Math.min(CANVAS_SIZE - PADDLE_WIDTH, mouseX - PADDLE_WIDTH / 2));
+    const finishMatch = (state: GameState) => {
+        gameOverRef.current = true;
+        state.isRunning = false;
+        setGameOver(true);
+        triggerShake(10);
+
+        const winnerColor = state.dayScore >= state.nightScore ? COLORS.dayAccent : COLORS.nightAccent;
+        for (let burst = 0; burst < 6; burst += 1) {
+            emitParticles(
+                CANVAS_SIZE * Math.random(),
+                CANVAS_SIZE * Math.random(),
+                winnerColor,
+                14,
+            );
+        }
+        narrate(
+            state.dayScore >= state.nightScore
+                ? `${state.rival.alias} could not hold the arena.`
+                : `${state.rival.alias} closed the duel hard.`,
+            state.dayScore >= state.nightScore ? 'positive' : 'warning',
+            0,
+        );
+    };
+
+    const update = (currentTime: number) => {
+        const state = stateRef.current;
+        if (!state || !state.isRunning || gameOverRef.current) return;
+
+        const delta = clamp((currentTime - lastFrameRef.current) / 16.6667, 0.65, 1.45);
+        lastFrameRef.current = currentTime;
+
+        const elapsed = (currentTime - startTimeRef.current) / 1000;
+        const remaining = Math.max(0, MATCH_DURATION - elapsed);
+        syncTime(Math.ceil(remaining));
+
+        if (remaining <= 0) {
+            finishMatch(state);
+            render();
+            return;
+        }
+
+        updateAI(state, delta, currentTime);
+        updateParticles(delta);
+        updateShake();
+
+        for (const ball of state.balls) {
+            if (ball.vy > 0) {
+                checkPaddleCollision(state, ball, state.playerPaddle, PLAYER_PADDLE_Y, -1, 'player');
+            }
+            if (ball.vy < 0) {
+                checkPaddleCollision(state, ball, state.aiPaddle, AI_PADDLE_Y, 1, 'rival');
+            }
+
+            detectTileCollision(ball, state.ownership);
+            checkBoundaries(state, ball);
+            updateBallPhysics(ball, delta);
+        }
+
+        const nextScore = recomputeScore(state.ownership);
+        state.dayScore = nextScore.day;
+        state.nightScore = nextScore.night;
+        syncScore(nextScore);
+        updateMomentum(state, remaining, currentTime);
+        render();
+        requestRef.current = requestAnimationFrame((nextTime) => updateRef.current(nextTime));
+    };
+    updateRef.current = update;
+
+    const initGame = useCallback(() => {
+        const nextRival = createRivalProfile(difficulty);
+        const initialScore = { day: (GRID_WIDTH * GRID_HEIGHT) / 2, night: (GRID_WIDTH * GRID_HEIGHT) / 2 };
+
+        stateRef.current = {
+            ownership: initOwnership(),
+            balls: createBalls(),
+            playerPaddle: {
+                x: CANVAS_SIZE / 2 - PADDLE_WIDTH / 2,
+                width: PADDLE_WIDTH,
+                height: PADDLE_HEIGHT,
+                velocity: 0,
+            },
+            aiPaddle: {
+                x: CANVAS_SIZE / 2 - PADDLE_WIDTH / 2,
+                width: PADDLE_WIDTH,
+                height: PADDLE_HEIGHT,
+                velocity: 0,
+            },
+            dayScore: initialScore.day,
+            nightScore: initialScore.night,
+            isRunning: true,
+            rival: nextRival,
+        };
+
+        particlesRef.current = [];
+        ringsRef.current = [];
+        shakeRef.current = { x: 0, y: 0, intensity: 0 };
+        gameOverRef.current = false;
+        lastNarrationRef.current = 0;
+        lastPingShiftRef.current = performance.now();
+        bestStreakRef.current = 0;
+        streakRef.current = 0;
+        leadStateRef.current = 'neutral';
+        phaseRef.current = 'OPENING';
+        momentumRef.current = 12;
+        scoreCacheRef.current = initialScore;
+        timeCacheRef.current = MATCH_DURATION;
+
+        startTimeRef.current = performance.now();
+        lastFrameRef.current = performance.now();
+        setRival(nextRival);
+        setPingMs(nextRival.pingMs);
+        feedRef.current = [];
+        setFeed([]);
+        setStreak(0);
+        setBestStreak(0);
+        setGameOver(false);
+        setIsPaused(false);
+        setMomentum(12);
+        setPhase('OPENING');
+        syncScore(initialScore);
+        syncTime(MATCH_DURATION);
+
+        updateFeedRef.current('Encrypted duel link secured.', 'neutral');
+        updateFeedRef.current(`${nextRival.alias} entered as ${nextRival.title}.`, 'positive');
+        updateFeedRef.current(nextRival.signature, 'neutral');
+    }, [createBalls, difficulty]);
+
+    const scheduleNextFrame = useCallback(() => {
+        requestRef.current = requestAnimationFrame((nextTime) => updateRef.current(nextTime));
     }, []);
 
-    const handleTouchMove = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    const handleMouseMove = useCallback((event: React.MouseEvent<HTMLCanvasElement>) => {
         if (!canvasRef.current || !stateRef.current || gameOverRef.current) return;
-        e.preventDefault();
+
         const rect = canvasRef.current.getBoundingClientRect();
         const scaleX = CANVAS_SIZE / rect.width;
-        const touchX = (e.touches[0].clientX - rect.left) * scaleX;
-        stateRef.current.playerPaddle.x = Math.max(0, Math.min(CANVAS_SIZE - PADDLE_WIDTH, touchX - PADDLE_WIDTH / 2));
-    }, []);
+        const targetX = (event.clientX - rect.left) * scaleX - PADDLE_WIDTH / 2;
+        const nextX = clamp(targetX, 0, CANVAS_SIZE - PADDLE_WIDTH);
+        const playerPaddle = stateRef.current.playerPaddle;
+
+        playerPaddle.velocity = nextX - playerPaddle.x;
+        playerPaddle.x = nextX;
+    }, [canvasRef]);
+
+    const handleTouchMove = useCallback((event: React.TouchEvent<HTMLCanvasElement>) => {
+        if (!canvasRef.current || !stateRef.current || gameOverRef.current) return;
+
+        event.preventDefault();
+        const rect = canvasRef.current.getBoundingClientRect();
+        const scaleX = CANVAS_SIZE / rect.width;
+        const targetX = (event.touches[0].clientX - rect.left) * scaleX - PADDLE_WIDTH / 2;
+        const nextX = clamp(targetX, 0, CANVAS_SIZE - PADDLE_WIDTH);
+        const playerPaddle = stateRef.current.playerPaddle;
+
+        playerPaddle.velocity = nextX - playerPaddle.x;
+        playerPaddle.x = nextX;
+    }, [canvasRef]);
 
     const restart = useCallback(() => {
-        if (requestRef.current) cancelAnimationFrame(requestRef.current);
+        if (requestRef.current !== null) {
+            cancelAnimationFrame(requestRef.current);
+        }
         initGame();
-        requestRef.current = requestAnimationFrame(update);
-    }, [initGame]);
+        scheduleNextFrame();
+    }, [initGame, scheduleNextFrame]);
 
     const togglePause = useCallback(() => {
-        if (!stateRef.current || gameOverRef.current) return;
+        const state = stateRef.current;
+        if (!state || gameOverRef.current) return;
 
-        if (stateRef.current.isRunning) {
-            // Pausing - store the current time
+        if (state.isRunning) {
             pauseTimeRef.current = performance.now();
-            stateRef.current.isRunning = false;
+            state.isRunning = false;
             setIsPaused(true);
-        } else {
-            // Resuming - adjust start time by how long we were paused
-            const pauseDuration = performance.now() - pauseTimeRef.current;
-            startTimeRef.current += pauseDuration;
-            stateRef.current.isRunning = true;
-            setIsPaused(false);
-            requestRef.current = requestAnimationFrame(update);
+            return;
         }
-    }, []);
+
+        const pauseDuration = performance.now() - pauseTimeRef.current;
+        startTimeRef.current += pauseDuration;
+        lastFrameRef.current = performance.now();
+        state.isRunning = true;
+        setIsPaused(false);
+        scheduleNextFrame();
+    }, [scheduleNextFrame]);
 
     useEffect(() => {
         initGame();
-        requestRef.current = requestAnimationFrame(update);
-        return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
-    }, [difficulty]);
+        scheduleNextFrame();
 
-    return { score, timeRemaining, streak, restart, togglePause, handleMouseMove, handleTouchMove, isPaused, gameOver };
+        return () => {
+            if (requestRef.current !== null) {
+                cancelAnimationFrame(requestRef.current);
+            }
+        };
+    }, [difficulty, initGame, scheduleNextFrame]);
+
+    return {
+        score,
+        timeRemaining,
+        streak,
+        bestStreak,
+        restart,
+        togglePause,
+        handleMouseMove,
+        handleTouchMove,
+        isPaused,
+        gameOver,
+        rival,
+        feed,
+        momentum,
+        phase,
+        pingMs,
+    };
 };

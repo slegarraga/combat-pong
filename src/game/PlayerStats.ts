@@ -1,163 +1,118 @@
 /**
- * Player stats service — tracks wins, losses, best scores, and territory conquered.
+ * Local-only player stats for the anonymous duel experience.
  *
- * Stats are always persisted to localStorage so they work without auth.
- * When a user is logged in, stats are synced to the Supabase `player_stats` table
- * (silently fails if the table hasn't been created yet).
- *
- * On login, cloud and local stats are merged by taking the higher value for each field.
+ * The goal is simple: preserve the satisfaction of progression without any
+ * account system, sync step, or backend dependency. Everything lives in
+ * `localStorage`, so the player can dip in, leave, and return with zero setup.
  */
 
-import { supabase } from '../supabaseClient';
+import type { Difficulty } from './types';
 
-/** Cumulative player statistics across all games. */
 export interface PlayerStats {
     gamesPlayed: number;
     wins: number;
     losses: number;
     totalTerritoryConquered: number;
     bestScore: number;
+    bestStreak: number;
+    bestMargin: number;
+    favoriteDifficulty: Difficulty;
+    lastRivalAlias: string;
     lastUpdated: string;
 }
 
-const STATS_KEY = 'combat_pong_stats';
+export interface GameRecordInput {
+    result: 'win' | 'loss';
+    territoryPercent: number;
+    bestStreak: number;
+    margin: number;
+    difficulty: Difficulty;
+    rivalAlias: string;
+}
 
-// Get stats from localStorage
+const STATS_KEY = 'combat_pong_stats_v2';
+
+const DEFAULT_STATS: PlayerStats = {
+    gamesPlayed: 0,
+    wins: 0,
+    losses: 0,
+    totalTerritoryConquered: 0,
+    bestScore: 0,
+    bestStreak: 0,
+    bestMargin: 0,
+    favoriteDifficulty: 'MEDIUM',
+    lastRivalAlias: 'None yet',
+    lastUpdated: new Date().toISOString(),
+};
+
+const isDifficulty = (value: unknown): value is Difficulty =>
+    value === 'EASY' || value === 'MEDIUM' || value === 'HARD' || value === 'NIGHTMARE';
+
 export const getLocalStats = (): PlayerStats => {
     try {
         const saved = localStorage.getItem(STATS_KEY);
-        if (saved) {
-            return JSON.parse(saved);
-        }
-    } catch (e) {
-        console.error('Error reading stats:', e);
-    }
+        if (!saved) return DEFAULT_STATS;
 
-    return {
-        gamesPlayed: 0,
-        wins: 0,
-        losses: 0,
-        totalTerritoryConquered: 0,
-        bestScore: 0,
-        lastUpdated: new Date().toISOString()
-    };
+        const parsed = JSON.parse(saved) as Partial<PlayerStats>;
+        return {
+            ...DEFAULT_STATS,
+            ...parsed,
+            favoriteDifficulty: isDifficulty(parsed.favoriteDifficulty) ? parsed.favoriteDifficulty : 'MEDIUM',
+            lastRivalAlias: parsed.lastRivalAlias || 'None yet',
+        };
+    } catch (error) {
+        console.error('Error reading local stats:', error);
+        return DEFAULT_STATS;
+    }
 };
 
-// Save stats to localStorage
-const saveLocalStats = (stats: PlayerStats): void => {
+const saveLocalStats = (stats: PlayerStats) => {
     try {
-        localStorage.setItem(STATS_KEY, JSON.stringify({
-            ...stats,
-            lastUpdated: new Date().toISOString()
-        }));
-    } catch (e) {
-        console.error('Error saving stats:', e);
+        localStorage.setItem(
+            STATS_KEY,
+            JSON.stringify({
+                ...stats,
+                lastUpdated: new Date().toISOString(),
+            }),
+        );
+    } catch (error) {
+        console.error('Error saving local stats:', error);
     }
 };
 
-// Record a game result
-export const recordGame = async (
-    result: 'win' | 'loss',
-    territoryPercent: number,
-    userId?: string
-): Promise<PlayerStats> => {
+/**
+ * Persists a completed duel and returns the updated stat snapshot.
+ *
+ * The function is synchronous because there is no backend anymore, which keeps
+ * the game-over flow simple and makes the call site easy to reason about.
+ */
+export const recordGame = (input: GameRecordInput): PlayerStats => {
     const stats = getLocalStats();
 
-    // Update local stats
     stats.gamesPlayed += 1;
-    if (result === 'win') {
+    stats.totalTerritoryConquered += input.territoryPercent;
+    stats.bestScore = Math.max(stats.bestScore, input.territoryPercent);
+    stats.bestStreak = Math.max(stats.bestStreak, input.bestStreak);
+    stats.bestMargin = Math.max(stats.bestMargin, Math.abs(input.margin));
+    stats.favoriteDifficulty = input.difficulty;
+    stats.lastRivalAlias = input.rivalAlias;
+
+    if (input.result === 'win') {
         stats.wins += 1;
     } else {
         stats.losses += 1;
     }
-    stats.totalTerritoryConquered += territoryPercent;
-    if (territoryPercent > stats.bestScore) {
-        stats.bestScore = territoryPercent;
-    }
 
     saveLocalStats(stats);
-
-    // Try to sync with Supabase if user is logged in
-    if (userId) {
-        try {
-            await syncToSupabase(userId, stats);
-        } catch (e) {
-            console.log('Supabase sync not available yet');
-        }
-    }
-
     return stats;
 };
 
-// Sync stats to Supabase (will silently fail if table doesn't exist)
-const syncToSupabase = async (userId: string, stats: PlayerStats): Promise<void> => {
-    const { error } = await supabase
-        .from('player_stats')
-        .upsert({
-            user_id: userId,
-            games_played: stats.gamesPlayed,
-            wins: stats.wins,
-            losses: stats.losses,
-            total_territory_conquered: stats.totalTerritoryConquered,
-            best_score: stats.bestScore,
-            updated_at: new Date().toISOString()
-        }, {
-            onConflict: 'user_id'
-        });
-
-    if (error) {
-        throw error;
-    }
-};
-
-// Load stats from Supabase (merge with local)
-export const loadFromSupabase = async (userId: string): Promise<PlayerStats | null> => {
-    try {
-        const { data, error } = await supabase
-            .from('player_stats')
-            .select('*')
-            .eq('user_id', userId)
-            .single();
-
-        if (error || !data) {
-            return null;
-        }
-
-        const cloudStats: PlayerStats = {
-            gamesPlayed: data.games_played,
-            wins: data.wins,
-            losses: data.losses,
-            totalTerritoryConquered: data.total_territory_conquered,
-            bestScore: data.best_score,
-            lastUpdated: data.updated_at
-        };
-
-        // Merge: take the higher values
-        const localStats = getLocalStats();
-        const mergedStats: PlayerStats = {
-            gamesPlayed: Math.max(cloudStats.gamesPlayed, localStats.gamesPlayed),
-            wins: Math.max(cloudStats.wins, localStats.wins),
-            losses: Math.max(cloudStats.losses, localStats.losses),
-            totalTerritoryConquered: Math.max(cloudStats.totalTerritoryConquered, localStats.totalTerritoryConquered),
-            bestScore: Math.max(cloudStats.bestScore, localStats.bestScore),
-            lastUpdated: new Date().toISOString()
-        };
-
-        saveLocalStats(mergedStats);
-        return mergedStats;
-    } catch (e) {
-        return null;
-    }
-};
-
-// Get win rate as percentage
-export const getWinRate = (stats: PlayerStats): number => {
+export const getWinRate = (stats: PlayerStats) => {
     if (stats.gamesPlayed === 0) return 0;
     return Math.round((stats.wins / stats.gamesPlayed) * 100);
 };
 
-// Get average territory conquered
-export const getAverageTerritory = (stats: PlayerStats): number => {
+export const getAverageTerritory = (stats: PlayerStats) => {
     if (stats.gamesPlayed === 0) return 0;
     return Math.round(stats.totalTerritoryConquered / stats.gamesPlayed);
 };

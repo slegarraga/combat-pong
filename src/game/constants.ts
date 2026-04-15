@@ -1,55 +1,108 @@
 /**
- * Game constants — all tunable values that control the game's physics, visuals, and difficulty.
+ * Shared constants for the anonymous duel experience.
  *
- * The game board is a 600x600px canvas divided into a 24x24 grid of 25px tiles.
- * Each tile is "owned" by either the Day (player) or Night (AI) team.
+ * These values are intentionally grouped here so designers and engineers can
+ * retune feel, visuals, and difficulty without hunting through the game loop.
  */
 
-// Canvas and grid dimensions
+import type { Difficulty } from './types';
+
 export const CANVAS_SIZE = 600;
 export const TILE_SIZE = 25;
-export const GRID_WIDTH = CANVAS_SIZE / TILE_SIZE; // 24
-export const GRID_HEIGHT = CANVAS_SIZE / TILE_SIZE; // 24
+export const GRID_WIDTH = CANVAS_SIZE / TILE_SIZE;
+export const GRID_HEIGHT = CANVAS_SIZE / TILE_SIZE;
 
-// Paddle settings
-export const PADDLE_WIDTH = 100;
-export const PADDLE_HEIGHT = 12;
-export const PADDLE_OFFSET = 15;
+export const MATCH_DURATION = 90;
 
-// Ball physics
-export const MAX_SPEED = 12;
-export const MIN_SPEED = 6;
+export const PADDLE_WIDTH = 112;
+export const PADDLE_HEIGHT = 14;
+export const PADDLE_OFFSET = 18;
+
+export const MAX_SPEED = 12.8;
+export const MIN_SPEED = 4.6;
 export const BASE_ACCELERATION = 0.08;
 export const BALL_RADIUS = TILE_SIZE / 2;
+export const TRAIL_LENGTH = 6;
 
-// Theme colors
 export const COLORS = {
-    // Day team (player) - warm cream/gold tones
-    day: '#F5E6D3',
-    dayAccent: '#D4A574',
-    dayBall: '#B8860B',
+    background: '#050b14',
+    backgroundElevated: '#0a1522',
+    surface: 'rgba(10, 18, 28, 0.78)',
+    surfaceStrong: 'rgba(8, 13, 20, 0.9)',
+    boardFrame: '#12273d',
+    gridLine: 'rgba(119, 161, 196, 0.12)',
+    centerLine: 'rgba(255, 255, 255, 0.08)',
+    text: '#edf4ff',
+    textMuted: '#8fa6bd',
+    textDim: '#60748a',
+    success: '#7effb3',
+    warning: '#ffbe6b',
+    danger: '#ff7d7d',
+    day: '#ffb86d',
+    dayAccent: '#ff6f3c',
+    dayBall: '#ffe6c2',
+    night: '#173b52',
+    nightAccent: '#4fdcff',
+    nightBall: '#d2f7ff',
+    paddle: '#f6fbff',
+} as const;
 
-    // Night team (AI) - cool slate/indigo tones
-    night: '#2D3748',
-    nightAccent: '#4A5568',
-    nightBall: '#667EEA',
-
-    // UI
-    paddle: '#FFFFFF',
-    background: '#1A1A2E',
-};
-
-/**
- * Difficulty presets — each level controls how many ball pairs spawn,
- * the overall speed multiplier, and how quickly the AI reacts.
- *
- * `ballMultiplier` — number of ball *pairs* (1 day + 1 night per pair)
- * `speedMod`       — multiplied against base ball speed and physics constants
- * `aiReaction`     — lerp factor per frame for AI paddle tracking (higher = faster)
- */
-export const DIFFICULTY = {
-    EASY: { ballMultiplier: 1, speedMod: 0.7, aiReaction: 0.03 },
-    MEDIUM: { ballMultiplier: 1, speedMod: 1.0, aiReaction: 0.06 },
-    HARD: { ballMultiplier: 2, speedMod: 1.2, aiReaction: 0.1 },
-    NIGHTMARE: { ballMultiplier: 3, speedMod: 1.5, aiReaction: 0.15 },
+export const DIFFICULTY: Record<
+    Difficulty,
+    {
+        label: string;
+        subtitle: string;
+        ballPairs: number;
+        speedMod: number;
+        aiReaction: number;
+        aiAggression: number;
+        aiPrecision: number;
+        wobble: number;
+        pingRange: [number, number];
+    }
+> = {
+    EASY: {
+        label: 'Warmup',
+        subtitle: 'Room to learn the board and ride clean streaks.',
+        ballPairs: 1,
+        speedMod: 0.84,
+        aiReaction: 0.05,
+        aiAggression: 0.28,
+        aiPrecision: 0.76,
+        wobble: 16,
+        pingRange: [52, 74],
+    },
+    MEDIUM: {
+        label: 'Crowd Favorite',
+        subtitle: 'The best balance of readable chaos and swingy endings.',
+        ballPairs: 1,
+        speedMod: 1.02,
+        aiReaction: 0.072,
+        aiAggression: 0.46,
+        aiPrecision: 0.84,
+        wobble: 12,
+        pingRange: [38, 58],
+    },
+    HARD: {
+        label: 'Pressure Test',
+        subtitle: 'Faster rival reads, tighter angles, uglier mistakes.',
+        ballPairs: 2,
+        speedMod: 1.18,
+        aiReaction: 0.096,
+        aiAggression: 0.6,
+        aiPrecision: 0.9,
+        wobble: 8,
+        pingRange: [24, 44],
+    },
+    NIGHTMARE: {
+        label: 'Blackout',
+        subtitle: 'A savage anonymous rival that punishes every lazy return.',
+        ballPairs: 3,
+        speedMod: 1.34,
+        aiReaction: 0.128,
+        aiAggression: 0.76,
+        aiPrecision: 0.95,
+        wobble: 5,
+        pingRange: [14, 32],
+    },
 };

@@ -1,147 +1,184 @@
 /**
- * Twitter/X sharing — generates a 1200x630 score card image and shares it.
+ * Local-only sharing helpers.
  *
- * Flow:
- *   1. `generateShareCard()` draws a score card onto an off-screen canvas
- *   2. `uploadToSupabase()` uploads the PNG to the `share-cards` storage bucket
- *   3. `shareToTwitter()` opens a Twitter intent URL with the image link and tweet text
- *   4. Falls back to sharing the game URL if Supabase upload fails
+ * Since the game no longer depends on Supabase storage, we keep the share loop
+ * frictionless by generating an image locally, attempting a native share when
+ * available, and otherwise downloading the card while copying the brag text.
  */
 
-import { COLORS } from './constants';
-import { supabase } from '../supabaseClient';
+import { COLORS, DIFFICULTY } from './constants';
+import type { Difficulty } from './types';
 
 interface ShareCardData {
     dayPercent: number;
-    difficulty: string;
+    difficulty: Difficulty;
     playerWon?: boolean;
+    rivalAlias: string;
+    bestStreak: number;
 }
 
-/** Renders a 1200x630 Open Graph-sized score card as a PNG blob. */
+const shareFilename = () => `combat-pong-duel-${Date.now()}.png`;
+
+const drawRoundedRect = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    radius: number,
+) => {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+};
+
+const getShareText = (data: ShareCardData) => {
+    const won = data.playerWon ?? data.dayPercent > 50;
+    const result = won ? 'won' : 'lost';
+    const difficultyLabel = DIFFICULTY[data.difficulty].label;
+
+    return `I ${result} an anonymous Combat Pong duel ${data.dayPercent}% to ${100 - data.dayPercent}% on ${difficultyLabel}. Rival: ${data.rivalAlias}. Best streak: ${data.bestStreak}x.`;
+};
+
 export const generateShareCard = async (data: ShareCardData): Promise<Blob> => {
     const canvas = document.createElement('canvas');
     canvas.width = 1200;
     canvas.height = 630;
-    const ctx = canvas.getContext('2d')!;
+    const ctx = canvas.getContext('2d');
 
-    // Background gradient
-    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-    gradient.addColorStop(0, COLORS.night);
-    gradient.addColorStop(0.5, COLORS.background);
-    gradient.addColorStop(1, COLORS.day);
-    ctx.fillStyle = gradient;
+    if (!ctx) {
+        throw new Error('Canvas rendering is unavailable.');
+    }
+
+    const background = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    background.addColorStop(0, COLORS.background);
+    background.addColorStop(0.55, COLORS.backgroundElevated);
+    background.addColorStop(1, COLORS.night);
+    ctx.fillStyle = background;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Grid pattern
-    ctx.globalAlpha = 0.1;
-    ctx.strokeStyle = '#FFFFFF';
-    for (let x = 0; x < canvas.width; x += 25) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= canvas.width; x += 32) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
         ctx.lineTo(x, canvas.height);
         ctx.stroke();
     }
-    for (let y = 0; y < canvas.height; y += 25) {
+    for (let y = 0; y <= canvas.height; y += 32) {
         ctx.beginPath();
         ctx.moveTo(0, y);
         ctx.lineTo(canvas.width, y);
         ctx.stroke();
     }
-    ctx.globalAlpha = 1;
 
-    // Title
-    ctx.font = 'bold 72px system-ui, -apple-system, sans-serif';
-    ctx.textAlign = 'center';
-    const textGradient = ctx.createLinearGradient(300, 0, 900, 0);
-    textGradient.addColorStop(0, COLORS.dayAccent);
-    textGradient.addColorStop(1, COLORS.nightBall);
-    ctx.fillStyle = textGradient;
-    ctx.fillText('COMBAT PONG', canvas.width / 2, 120);
+    drawRoundedRect(ctx, 80, 72, 1040, 486, 34);
+    ctx.fillStyle = COLORS.surfaceStrong;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
 
-    // Big percentage
-    ctx.font = 'bold 200px system-ui, -apple-system, sans-serif';
+    const accent = ctx.createLinearGradient(120, 0, 1080, 0);
+    accent.addColorStop(0, COLORS.dayAccent);
+    accent.addColorStop(1, COLORS.nightAccent);
+
+    ctx.font = '700 34px "Space Grotesk", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = COLORS.textMuted;
+    ctx.fillText('COMBAT PONG // ANONYMOUS DUEL', 128, 140);
+
+    ctx.font = '900 184px "Space Grotesk", sans-serif';
+    ctx.fillStyle = COLORS.text;
     ctx.shadowColor = COLORS.dayAccent;
-    ctx.shadowBlur = 40;
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillText(`${data.dayPercent}%`, canvas.width / 2, 380);
+    ctx.shadowBlur = 36;
+    ctx.fillText(`${data.dayPercent}%`, 120, 360);
     ctx.shadowBlur = 0;
 
-    // Label
-    ctx.font = '32px system-ui, -apple-system, sans-serif';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-    ctx.fillText('TERRITORY CONTROLLED', canvas.width / 2, 440);
+    ctx.font = '700 28px "IBM Plex Mono", monospace';
+    ctx.fillStyle = COLORS.textMuted;
+    ctx.fillText('TERRITORY CONTROLLED', 128, 404);
 
-    // Difficulty badge
-    ctx.font = 'bold 36px system-ui, -apple-system, sans-serif';
-    const won = data.playerWon ?? data.dayPercent > 50;
-    ctx.fillText(`${won ? '🏆' : '💀'}  •  ${data.difficulty}`, canvas.width / 2, 520);
+    ctx.fillStyle = accent;
+    ctx.font = '700 42px "Space Grotesk", sans-serif';
+    ctx.fillText(data.playerWon ?? data.dayPercent > 50 ? 'Victory secured' : 'Pressure broke late', 128, 478);
 
-    // CTA
-    ctx.font = 'bold 40px system-ui, -apple-system, sans-serif';
-    ctx.fillStyle = textGradient;
-    ctx.fillText('CAN YOU BEAT ME? 🎮', canvas.width / 2, 590);
+    ctx.font = '600 26px "IBM Plex Mono", monospace';
+    ctx.fillStyle = COLORS.text;
+    ctx.fillText(`Rival  ${data.rivalAlias}`, 730, 182);
+    ctx.fillText(`Mode   ${DIFFICULTY[data.difficulty].label}`, 730, 230);
+    ctx.fillText(`Streak ${data.bestStreak}x`, 730, 278);
+    ctx.fillText(`Split  ${100 - data.dayPercent}% / ${data.dayPercent}%`, 730, 326);
 
-    return new Promise((resolve) => {
-        canvas.toBlob((blob) => resolve(blob!), 'image/png', 1.0);
+    ctx.font = '600 24px "Space Grotesk", sans-serif';
+    ctx.fillStyle = COLORS.textMuted;
+    ctx.fillText('No login. No queue. Just a savage fake 1v1.', 730, 396);
+    ctx.fillText('combatpong.com', 730, 438);
+
+    return new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => {
+            if (!blob) {
+                reject(new Error('Unable to generate share card.'));
+                return;
+            }
+            resolve(blob);
+        }, 'image/png', 1);
     });
 };
 
-// Upload image to Supabase Storage and get public URL
-const uploadToSupabase = async (imageBlob: Blob): Promise<string | null> => {
-    try {
-        const filename = `score_${Date.now()}_${Math.random().toString(36).slice(2)}.png`;
-
-        const { error } = await supabase.storage
-            .from('share-cards')
-            .upload(filename, imageBlob, {
-                contentType: 'image/png',
-                cacheControl: '31536000',
-                upsert: true
-            });
-
-        if (error) {
-            console.error('Supabase upload error:', error);
-            return null;
-        }
-
-        const { data: urlData } = supabase.storage
-            .from('share-cards')
-            .getPublicUrl(filename);
-
-        return urlData.publicUrl;
-    } catch (err) {
-        console.error('Upload failed:', err);
-        return null;
-    }
+const downloadBlob = (blob: Blob) => {
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = shareFilename();
+    anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 500);
 };
 
-/** Generates a score card, uploads it, and opens a Twitter intent window. */
-export const shareToTwitter = async (data: ShareCardData): Promise<'success' | 'fallback'> => {
-    // Generate the image
-    const imageBlob = await generateShareCard(data);
+export const shareToTwitter = async (
+    data: ShareCardData,
+): Promise<'shared' | 'copied' | 'downloaded'> => {
+    const shareText = getShareText(data);
+    const blob = await generateShareCard(data);
+    const file = new File([blob], shareFilename(), { type: 'image/png' });
+    const shareUrl = window.location.origin;
 
-    // Upload to Supabase to get public URL
-    const imageUrl = await uploadToSupabase(imageBlob);
-
-    // Determine win/loss
-    const won = data.playerWon ?? data.dayPercent > 50;
-    const result = won ? '🏆 WON' : '💀 LOST';
-    const diffEmoji = data.difficulty === 'NIGHTMARE' ? '👹' : data.difficulty === 'HARD' ? '🔥' : data.difficulty === 'MEDIUM' ? '⚔️' : '🌱';
-
-    // Short, punchy tweet
-    const tweetText = `${result} with ${data.dayPercent}% territory in Combat Pong ${diffEmoji}
-
-Beat my score 👇`;
-
-    const gameUrl = window.location.origin;
-
-    if (imageUrl) {
-        const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(imageUrl)}`;
-        window.open(tweetUrl, '_blank', 'width=550,height=420');
-        return 'success';
-    } else {
-        const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(gameUrl)}`;
-        window.open(tweetUrl, '_blank', 'width=550,height=420');
-        return 'fallback';
+    try {
+        if (navigator.share && navigator.canShare?.({ files: [file] })) {
+            await navigator.share({
+                title: 'Combat Pong',
+                text: shareText,
+                url: shareUrl,
+                files: [file],
+            });
+            return 'shared';
+        }
+    } catch (error) {
+        console.warn('Native share failed, using local fallback:', error);
     }
+
+    let copied = false;
+    if (navigator.clipboard?.writeText) {
+        try {
+            await navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
+            copied = true;
+        } catch (error) {
+            console.warn('Clipboard write failed:', error);
+        }
+    }
+
+    downloadBlob(blob);
+
+    const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
+    window.open(tweetUrl, '_blank', 'width=550,height=420');
+
+    return copied ? 'copied' : 'downloaded';
 };

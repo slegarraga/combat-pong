@@ -1,34 +1,95 @@
 /**
- * Core type definitions for the game engine.
+ * Core type definitions for Combat Pong's anonymous duel mode.
  *
- * The game has two teams — "day" (player, bottom paddle) and "night" (AI, top paddle).
- * Territory is tracked as a flat array where each index maps to a grid tile.
+ * The player always controls the bottom paddle ("day"), while the top paddle
+ * is driven by a simulated anonymous rival ("night"). The rival is entirely
+ * local, but its timing, alias, signal strength, and narration are tuned to
+ * feel like a live 1v1 duel.
  */
 
-/** The two competing teams. Day = warm/gold (player), Night = cool/indigo (AI). */
 export type Team = 'day' | 'night';
 
-/** A ball that moves across the board and converts tiles it touches. */
+export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD' | 'NIGHTMARE';
+
+export type FeedTone = 'neutral' | 'positive' | 'warning';
+
+export interface TrailPoint {
+    x: number;
+    y: number;
+    alpha: number;
+}
+
+/** A ball that paints territory for its team and carries its own momentum. */
 export interface Ball {
+    id: string;
     x: number;
     y: number;
     vx: number;
     vy: number;
     team: Team;
-    /** Current speed boost from the streak system (1.0 = normal, 1.25 = 1 hit, etc.) */
-    speedMultiplier?: number;
+    /**
+     * Persistent speed bonus granted by clean paddle returns.
+     * The player can snowball this aggressively with clean streak play.
+     */
+    speedMultiplier: number;
+    trail: TrailPoint[];
 }
 
-/** A horizontal paddle that deflects balls. */
+/** Horizontal paddle state plus a cached velocity for richer rendering. */
 export interface Paddle {
     x: number;
     width: number;
     height: number;
+    velocity: number;
 }
 
-/** The complete state of a running game, mutated each frame by the game loop. */
+/** Short-lived rings used to make hits and tile captures feel physical. */
+export interface ImpactRing {
+    x: number;
+    y: number;
+    radius: number;
+    alpha: number;
+    growth: number;
+    color: string;
+}
+
+/** Feed entries shown in the HUD to sell the "live anonymous duel" illusion. */
+export interface FeedEvent {
+    id: number;
+    text: string;
+    tone: FeedTone;
+}
+
+/** Persona data used to make the rival feel distinct from match to match. */
+export interface RivalProfile {
+    alias: string;
+    title: string;
+    signature: string;
+    pingMs: number;
+    reaction: number;
+    aggression: number;
+    precision: number;
+    wobble: number;
+    feintWindow: number;
+}
+
+export interface ScoreSnapshot {
+    day: number;
+    night: number;
+}
+
+export interface MatchSummary {
+    difficulty: Difficulty;
+    rivalAlias: string;
+    playerWon: boolean;
+    dayPercent: number;
+    nightPercent: number;
+    margin: number;
+    bestStreak: number;
+}
+
+/** Complete mutable engine state owned by the animation loop. */
 export interface GameState {
-    /** Flat array of tile ownership. Index = col + row * GRID_WIDTH. */
     ownership: Team[];
     balls: Ball[];
     playerPaddle: Paddle;
@@ -36,6 +97,5 @@ export interface GameState {
     dayScore: number;
     nightScore: number;
     isRunning: boolean;
-    dayColor: string;
-    nightColor: string;
+    rival: RivalProfile;
 }

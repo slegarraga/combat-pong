@@ -1,30 +1,60 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;700;900&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --cp-bg: #050b14;
+  --cp-bg-elevated: #09121d;
+  --cp-surface: rgba(10, 18, 28, 0.78);
+  --cp-surface-strong: rgba(8, 13, 20, 0.92);
+  --cp-border: rgba(255, 255, 255, 0.08);
+  --cp-text: #edf4ff;
+  --cp-muted: #8fa6bd;
+  --cp-dim: #61748a;
+  --cp-ember: #ff6f3c;
+  --cp-sand: #ffbe7a;
+  --cp-ice: #4fdcff;
+  --cp-teal: #163b53;
+  --cp-shadow: 0 24px 60px rgba(0, 0, 0, 0.38);
+}
 
 html {
   margin: 0;
   padding: 0;
   width: 100%;
   min-height: 100%;
-  background: #1a1a2e;
-  color: white;
+  background: var(--cp-bg);
+  color: var(--cp-text);
 }
 
 body {
   margin: 0;
-  padding: 0;
   width: 100%;
   min-height: 100%;
-  background: #1a1a2e;
-  color: white;
   overflow-x: hidden;
-  /* Only prevent horizontal scroll */
   overflow-y: auto;
-  /* Allow vertical scroll */
+  background:
+    radial-gradient(circle at 15% 18%, rgba(255, 111, 60, 0.14), transparent 26%),
+    radial-gradient(circle at 82% 8%, rgba(79, 220, 255, 0.14), transparent 28%),
+    linear-gradient(180deg, #08111b 0%, #050b14 52%, #07111d 100%);
+  color: var(--cp-text);
+  font-family: "Space Grotesk", system-ui, sans-serif;
 }
 
-/* Game-specific: prevent scroll only during gameplay */
+body,
+button,
+input,
+textarea,
+select {
+  font-family: "Space Grotesk", system-ui, sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}
+
 .game-active {
   overflow: hidden !important;
   position: fixed;
@@ -32,8 +62,7 @@ body {
   height: 100%;
 }
 
-/* Mesh Gradient Button */
-@keyframes mesh-shift {
+@keyframes ember-shift {
   0% {
     background-position: 0% 50%;
   }
@@ -47,67 +76,166 @@ body {
   }
 }
 
+@keyframes float-grid {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  50% {
+    transform: translate3d(0, -8px, 0);
+  }
+
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 .btn-gradient {
-  background: linear-gradient(135deg,
-      #7b2cbf 0%,
-      #3a86ff 35%,
-      #ff006e 65%,
-      #7b2cbf 100%);
-  background-size: 300% 300%;
-  animation: mesh-shift 3s ease-in-out infinite;
-  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1),
-    filter 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   border: none;
-  will-change: transform, box-shadow, filter;
-  transform: translateZ(0);
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.08), transparent 35%),
+    linear-gradient(135deg, var(--cp-ember) 0%, #ff9457 22%, #ffb36d 44%, #4fdcff 100%);
+  background-size: 220% 220%;
+  animation: ember-shift 5s ease infinite;
+  box-shadow: 0 16px 40px rgba(255, 111, 60, 0.26);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    filter 0.18s ease;
 }
 
 .btn-gradient:hover {
-  transform: scale(1.03) translateZ(0);
-  box-shadow: 0 0 30px rgba(123, 44, 191, 0.5), 0 0 50px rgba(58, 134, 255, 0.3);
-  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 20px 50px rgba(255, 111, 60, 0.32);
+  filter: saturate(1.08);
 }
 
 .btn-gradient:active {
-  transform: scale(0.97) translateZ(0);
+  transform: translateY(1px) scale(0.99);
 }
 
-/* Mesh Gradient Text */
-.text-gradient {
-  background: linear-gradient(135deg,
-      #7b2cbf 0%,
-      #3a86ff 35%,
-      #ff006e 65%,
-      #7b2cbf 100%);
-  background-size: 300% 300%;
-  animation: mesh-shift 6s ease infinite;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* Mesh Gradient Border */
-.border-gradient {
+.cp-panel {
   position: relative;
-  background: #1a1a2e;
+  border: 1px solid var(--cp-border);
+  border-radius: 1.75rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 34%),
+    var(--cp-surface);
+  padding: 1.25rem;
+  box-shadow: var(--cp-shadow);
+  backdrop-filter: blur(18px);
 }
 
-.border-gradient::before {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  border-radius: inherit;
-  padding: 2px;
-  background: linear-gradient(135deg,
-      #7b2cbf 0%,
-      #3a86ff 35%,
-      #ff006e 65%,
-      #7b2cbf 100%);
-  background-size: 300% 300%;
-  animation: mesh-shift 6s ease infinite;
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  z-index: -1;
+.cp-chip {
+  border: 1px solid var(--cp-border);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+}
+
+.cp-kicker {
+  margin: 0;
+  font-size: 0.74rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--cp-muted);
+}
+
+.cp-stat-card {
+  border-radius: 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.95rem;
+}
+
+.cp-stat-label {
+  display: block;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--cp-dim);
+}
+
+.cp-stat-value {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 1.45rem;
+  line-height: 1;
+  color: var(--cp-text);
+}
+
+.cp-mode-card {
+  border-radius: 1.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(135deg, rgba(255, 111, 60, 0.09), transparent 45%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  padding: 1.15rem;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.cp-mode-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(79, 220, 255, 0.22);
+  background:
+    linear-gradient(135deg, rgba(255, 111, 60, 0.15), transparent 45%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03));
+}
+
+.cp-button-secondary {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.8rem 1.15rem;
+  color: var(--cp-text);
+  transition:
+    transform 0.16s ease,
+    background 0.16s ease,
+    border-color 0.16s ease;
+}
+
+.cp-button-secondary:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.cp-home-bg {
+  background:
+    radial-gradient(circle at 14% 26%, rgba(255, 111, 60, 0.16), transparent 26%),
+    radial-gradient(circle at 88% 14%, rgba(79, 220, 255, 0.14), transparent 24%),
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: auto, auto, 56px 56px, 56px 56px;
+  background-position: center;
+  opacity: 0.72;
+  animation: float-grid 8s ease-in-out infinite;
+}
+
+.cp-arena-noise {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(79, 220, 255, 0.05), transparent 38%),
+    radial-gradient(circle at 50% 100%, rgba(255, 111, 60, 0.06), transparent 42%);
+  opacity: 0.9;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-gradient,
+  .cp-home-bg {
+    animation: none;
+  }
+
+  .btn-gradient,
+  .cp-mode-card,
+  .cp-button-secondary {
+    transition: none;
+  }
 }
