@@ -48,6 +48,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
     const [hasRecordedGame, setHasRecordedGame] = useState(false);
     const [stats, setStats] = useState<PlayerStats | null>(null);
     const [isPointerLocked, setIsPointerLocked] = useState(false);
+    const [isCoarsePointer, setIsCoarsePointer] = useState(false);
 
     const total = score.day + score.night;
     const dayPercent = total > 0 ? Math.round((score.day / total) * 100) : 50;
@@ -67,6 +68,21 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
         : timeRemaining <= 28
             ? COLORS.warning
             : COLORS.text;
+
+    useEffect(() => {
+        const mediaQuery = window.matchMedia('(pointer: coarse)');
+        const updatePointerMode = () => setIsCoarsePointer(mediaQuery.matches);
+
+        updatePointerMode();
+
+        if (typeof mediaQuery.addEventListener === 'function') {
+            mediaQuery.addEventListener('change', updatePointerMode);
+            return () => mediaQuery.removeEventListener('change', updatePointerMode);
+        }
+
+        mediaQuery.addListener(updatePointerMode);
+        return () => mediaQuery.removeListener(updatePointerMode);
+    }, []);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -143,17 +159,23 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
     };
 
     const lockCursorToArena = () => {
-        if (gameOver || isPaused) return;
+        if (gameOver || isPaused || isCoarsePointer) return;
         canvasRef.current?.requestPointerLock?.();
     };
 
     const shareLabel = {
-        idle: 'Post your score',
-        sharing: 'Preparing...',
+        idle: 'Share the board',
+        sharing: 'Building card...',
         shared: 'Posted',
-        copied: 'Copied + saved',
-        downloaded: 'Saved locally',
+        copied: 'Copied card',
+        downloaded: 'Saved card',
     }[shareStatus];
+    const pointerHint = isCoarsePointer
+        ? 'Drag to steer the lower paddle'
+        : isPointerLocked
+            ? 'Aim locked • press Esc to release'
+            : 'Click once to lock aim';
+    const quickActionCopy = isCoarsePointer ? 'Touch ready.' : 'Aim fast. Rematch faster.';
 
     return (
         <div className="min-h-screen min-h-[100dvh] overflow-hidden bg-[var(--cp-bg)] text-[var(--cp-text)]">
@@ -170,11 +192,11 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                             </button>
                         )}
                         <div className="cp-chip rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.22em] text-[var(--cp-muted)]">
-                            Anonymous duel protocol
+                            Arena online
                         </div>
                     </div>
                     <div
-                        className="rounded-full border border-white/10 px-4 py-2 font-mono text-xl sm:text-2xl"
+                        className="cp-timer-pill cp-display rounded-full border border-white/10 px-4 py-2 text-xl sm:text-2xl"
                         style={{ color: timerColor }}
                     >
                         {formatTime(timeRemaining)}
@@ -186,8 +208,8 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                         <section className="cp-panel">
                             <div className="mb-4 flex items-center justify-between">
                                 <div>
-                                    <p className="cp-kicker">You</p>
-                                    <h2 className="text-xl font-black text-[var(--cp-text)]">Control the lower half</h2>
+                                    <p className="cp-kicker">Your side</p>
+                                    <h2 className="cp-display text-2xl font-black text-[var(--cp-text)]">Own the lower half</h2>
                                 </div>
                                 <div
                                     className="rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-[0.22em]"
@@ -220,11 +242,11 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                         </section>
 
                         <section className="cp-panel">
-                            <p className="cp-kicker">Match rules</p>
+                            <p className="cp-kicker">How it swings</p>
                             <ul className="space-y-3 text-sm leading-relaxed text-[var(--cp-muted)]">
-                                <li>Push the lower paddle with your mouse or thumb.</li>
-                                <li>Each clean return feeds your streak and makes your next touch nastier.</li>
-                                <li>Own more territory than the rival when the clock hits zero.</li>
+                                <li>Drive the lower paddle with your mouse or thumb.</li>
+                                <li>Clean returns build pressure and sharpen the next touch.</li>
+                                <li>Finish above 50% territory when the horn lands.</li>
                             </ul>
                         </section>
 
@@ -257,8 +279,8 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                         <section className="cp-panel">
                             <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                                 <div>
-                                    <p className="cp-kicker">Live board control</p>
-                                    <h1 className="text-3xl font-black tracking-tight sm:text-4xl">
+                                    <p className="cp-kicker">Live duel</p>
+                                    <h1 className="cp-display text-3xl font-black tracking-tight sm:text-4xl">
                                         Combat Pong
                                     </h1>
                                 </div>
@@ -296,7 +318,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                                 {!gameOver && (
                                     <div className="pointer-events-none absolute inset-x-5 bottom-4 z-10 flex justify-center">
                                         <div className="cp-chip rounded-full px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-[var(--cp-muted)]">
-                                            {isPointerLocked ? 'Cursor locked • press Esc to release' : 'Click board to lock cursor'}
+                                            {pointerHint}
                                         </div>
                                     </div>
                                 )}
@@ -316,16 +338,15 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                                         <div className="w-full max-w-md text-center">
                                             <p className="cp-kicker">Match complete</p>
                                             <h2
-                                                className="mt-2 text-4xl font-black sm:text-5xl"
+                                                className="cp-display mt-2 text-4xl font-black sm:text-5xl"
                                                 style={{ color: playerWon ? COLORS.success : COLORS.nightBall }}
                                             >
                                                 {playerWon ? 'Arena secured' : 'Rival held firm'}
                                             </h2>
                                             <p className="mt-3 text-sm leading-relaxed text-[var(--cp-muted)]">
                                                 {playerWon
-                                                    ? `You put ${dayPercent}% on ${rival.alias}.`
-                                                    : `${rival.alias} closed it ${nightPercent}% to ${dayPercent}%.`}
-                                                {' '}Run it back fast or post the score.
+                                                    ? `You finished with ${dayPercent}% against ${rival.alias}. Queue the next duel while the rhythm is hot.`
+                                                    : `${rival.alias} edged it ${nightPercent}% to ${dayPercent}%. Jump back in and take the board right away.`}
                                             </p>
 
                                             <div className="mt-5 grid grid-cols-3 gap-3">
@@ -345,17 +366,17 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
 
                                             <div className="mt-5 space-y-3">
                                                 <button
+                                                    onClick={handleRestart}
+                                                    className="btn-gradient w-full justify-center rounded-2xl px-5 py-4 text-base font-bold text-white"
+                                                >
+                                                    Instant rematch
+                                                </button>
+                                                <button
                                                     onClick={handleShare}
                                                     disabled={shareStatus === 'sharing'}
                                                     className="cp-button-secondary w-full justify-center disabled:cursor-wait disabled:opacity-70"
                                                 >
                                                     {shareLabel}
-                                                </button>
-                                                <button
-                                                    onClick={handleRestart}
-                                                    className="btn-gradient w-full justify-center rounded-2xl px-5 py-4 text-base font-bold text-white"
-                                                >
-                                                    Instant rematch
                                                 </button>
                                             </div>
                                         </div>
@@ -376,7 +397,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                                 Reset board
                             </button>
                             <div className="cp-chip rounded-full px-4 py-3 text-sm text-[var(--cp-muted)]">
-                                Tap, play, rematch.
+                                {quickActionCopy}
                             </div>
                         </div>
                     </main>
@@ -385,8 +406,8 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                         <section className="cp-panel">
                             <div className="mb-4 flex items-start justify-between gap-4">
                                 <div>
-                                    <p className="cp-kicker">Simulated rival</p>
-                                    <h2 className="text-2xl font-black">{rival.alias}</h2>
+                                    <p className="cp-kicker">Matched rival</p>
+                                    <h2 className="cp-display text-2xl font-black">{rival.alias}</h2>
                                     <p className="mt-1 text-sm text-[var(--cp-muted)]">{rival.title}</p>
                                 </div>
                                 <div className="cp-chip rounded-full px-3 py-2 font-mono text-sm">
@@ -398,7 +419,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                             </p>
                             <div className="mt-5">
                                 <div className="mb-2 flex items-center justify-between text-xs uppercase tracking-[0.2em] text-[var(--cp-dim)]">
-                                    <span>Duel intensity</span>
+                                    <span>Match pulse</span>
                                     <span>{momentum}%</span>
                                 </div>
                                 <div className="h-3 overflow-hidden rounded-full bg-black/40">
@@ -415,7 +436,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
 
                         <section className="cp-panel">
                             <div className="mb-4 flex items-center justify-between">
-                                <p className="cp-kicker">Live feed</p>
+                                <p className="cp-kicker">Arena feed</p>
                                 <span className="text-xs uppercase tracking-[0.18em] text-[var(--cp-dim)]">
                                     {phase}
                                 </span>
