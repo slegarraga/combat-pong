@@ -35,6 +35,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
         togglePause,
         handleMouseMove,
         handlePointerDelta,
+        handleTouchStart,
         handleTouchMove,
         isPaused,
         gameOver,
@@ -170,9 +171,9 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
     }, [soundEnabled]);
 
     const handleArenaTouchStart = useCallback((event: React.TouchEvent<HTMLCanvasElement>) => {
-        event.preventDefault();
+        handleTouchStart(event);
         void primeArenaAudio();
-    }, []);
+    }, [handleTouchStart]);
 
     const lockCursorToArena = useCallback(() => {
         void primeArenaAudio();

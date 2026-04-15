@@ -22,7 +22,13 @@ import {
     MIN_SPEED,
     OPENING_LAUNCH_SPEED,
     PADDLE_HEIGHT,
+    PADDLE_IMPACT_REFERENCE_SPEED,
     PADDLE_OFFSET,
+    PADDLE_DAMPING,
+    PADDLE_MAX_TRAVEL_SPEED,
+    PADDLE_POINTER_GAIN,
+    PADDLE_TARGET_BLEND,
+    PADDLE_TARGET_RESPONSE,
     PADDLE_WIDTH,
     PLAYER_RETURN_BOOST,
     PLAYER_SPIN_FACTOR,
@@ -393,6 +399,45 @@ export const useGameLoop = (
         });
     };
 
+    /**
+     * Moves the player paddle toward the latest input target with a short
+     * response curve so control feels precise without behaving like a raw
+     * cursor snap.
+     */
+    const updatePlayerPaddle = (state: GameState, delta: number) => {
+        const paddle = state.playerPaddle;
+        const distance = paddle.targetX - paddle.x;
+        const catchUp = clamp(Math.abs(distance) / 72, 0, 1);
+        const clutchBonus = clutchDriveRef.current * 0.05;
+        const response = PADDLE_TARGET_RESPONSE + catchUp * 0.32 + clutchBonus;
+        const desiredVelocity = clamp(
+            distance * response,
+            -PADDLE_MAX_TRAVEL_SPEED,
+            PADDLE_MAX_TRAVEL_SPEED,
+        );
+        const blend = PADDLE_TARGET_BLEND + catchUp * 0.24;
+
+        paddle.velocity += (desiredVelocity - paddle.velocity) * blend * delta;
+        paddle.velocity *= Math.pow(PADDLE_DAMPING, delta);
+
+        const nextX = clamp(paddle.x + paddle.velocity * delta, 0, CANVAS_SIZE - paddle.width);
+        const overshot =
+            (distance > 0 && nextX >= paddle.targetX) ||
+            (distance < 0 && nextX <= paddle.targetX);
+
+        if (overshot && Math.abs(distance) < 46) {
+            paddle.x = paddle.targetX;
+            paddle.velocity *= 0.38;
+        } else {
+            paddle.x = nextX;
+        }
+
+        if (Math.abs(paddle.targetX - paddle.x) < 0.25 && Math.abs(paddle.velocity) < 0.3) {
+            paddle.x = paddle.targetX;
+            paddle.velocity = 0;
+        }
+    };
+
     const awardPlayerStreak = (state: GameState, ball: Ball) => {
         streakRef.current += 1;
         bestStreakRef.current = Math.max(bestStreakRef.current, streakRef.current);
@@ -430,7 +475,7 @@ export const useGameLoop = (
         owner: 'player' | 'rival',
     ) => {
         const hitOffset = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
-        const impactPower = clamp(Math.abs(paddle.velocity) / (owner === 'player' ? 20 : 24), 0, 1.35);
+        const impactPower = clamp(Math.abs(paddle.velocity) / (owner === 'player' ? PADDLE_IMPACT_REFERENCE_SPEED : 26), 0, 1.35);
         const paddleInfluence = paddle.velocity * (0.08 + impactPower * 0.035);
         const spin = hitOffset * (owner === 'player' ? PLAYER_SPIN_FACTOR : RIVAL_SPIN_FACTOR) + paddleInfluence;
         const currentSpeed = Math.hypot(ball.vx, ball.vy);
@@ -789,12 +834,16 @@ export const useGameLoop = (
         ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
 
-        ctx.shadowBlur = 20;
+        renderPaddleTrail(ctx, state.playerPaddle, PLAYER_PADDLE_Y, COLORS.dayAccent);
+        renderPaddleTrail(ctx, state.aiPaddle, AI_PADDLE_Y, COLORS.nightAccent);
+
+        ctx.shadowBlur = 20 + clamp(Math.abs(state.playerPaddle.velocity) * 0.55, 0, 16);
         ctx.shadowColor = COLORS.dayAccent;
         ctx.fillStyle = COLORS.paddle;
         maybeRoundRect(ctx, state.playerPaddle.x, PLAYER_PADDLE_Y, state.playerPaddle.width, state.playerPaddle.height, 8);
         ctx.fill();
 
+        ctx.shadowBlur = 18 + clamp(Math.abs(state.aiPaddle.velocity) * 0.38, 0, 10);
         ctx.shadowColor = COLORS.nightAccent;
         maybeRoundRect(ctx, state.aiPaddle.x, AI_PADDLE_Y, state.aiPaddle.width, state.aiPaddle.height, 8);
         ctx.fill();
@@ -874,6 +923,7 @@ export const useGameLoop = (
             return;
         }
 
+        updatePlayerPaddle(state, delta);
         updateAI(state, delta, currentTime);
         updateParticles(delta);
         updateShake();
@@ -912,12 +962,14 @@ export const useGameLoop = (
                 x: CANVAS_SIZE / 2 - PADDLE_WIDTH / 2,
                 width: PADDLE_WIDTH,
                 height: PADDLE_HEIGHT,
+                targetX: CANVAS_SIZE / 2 - PADDLE_WIDTH / 2,
                 velocity: 0,
             },
             aiPaddle: {
                 x: CANVAS_SIZE / 2 - PADDLE_WIDTH / 2,
                 width: PADDLE_WIDTH,
                 height: PADDLE_HEIGHT,
+                targetX: CANVAS_SIZE / 2 - PADDLE_WIDTH / 2,
                 velocity: 0,
             },
             dayScore: initialScore.day,
@@ -967,18 +1019,30 @@ export const useGameLoop = (
         requestRef.current = requestAnimationFrame((nextTime) => updateRef.current(nextTime));
     }, []);
 
+    const setPlayerPaddleTarget = useCallback((nextX: number) => {
+        if (!stateRef.current || gameOverRef.current) return;
+
+        stateRef.current.playerPaddle.targetX = clamp(nextX, 0, CANVAS_SIZE - PADDLE_WIDTH);
+    }, []);
+
     const handleMouseMove = useCallback((event: React.MouseEvent<HTMLCanvasElement>) => {
         if (!canvasRef.current || !stateRef.current || gameOverRef.current) return;
 
         const rect = canvasRef.current.getBoundingClientRect();
         const scaleX = CANVAS_SIZE / rect.width;
         const targetX = (event.clientX - rect.left) * scaleX - PADDLE_WIDTH / 2;
-        const nextX = clamp(targetX, 0, CANVAS_SIZE - PADDLE_WIDTH);
-        const playerPaddle = stateRef.current.playerPaddle;
+        setPlayerPaddleTarget(targetX);
+    }, [canvasRef, setPlayerPaddleTarget]);
 
-        playerPaddle.velocity = nextX - playerPaddle.x;
-        playerPaddle.x = nextX;
-    }, [canvasRef]);
+    const handleTouchStart = useCallback((event: React.TouchEvent<HTMLCanvasElement>) => {
+        if (!canvasRef.current || !stateRef.current || gameOverRef.current) return;
+
+        event.preventDefault();
+        const rect = canvasRef.current.getBoundingClientRect();
+        const scaleX = CANVAS_SIZE / rect.width;
+        const targetX = (event.touches[0].clientX - rect.left) * scaleX - PADDLE_WIDTH / 2;
+        setPlayerPaddleTarget(targetX);
+    }, [canvasRef, setPlayerPaddleTarget]);
 
     const handleTouchMove = useCallback((event: React.TouchEvent<HTMLCanvasElement>) => {
         if (!canvasRef.current || !stateRef.current || gameOverRef.current) return;
@@ -987,21 +1051,41 @@ export const useGameLoop = (
         const rect = canvasRef.current.getBoundingClientRect();
         const scaleX = CANVAS_SIZE / rect.width;
         const targetX = (event.touches[0].clientX - rect.left) * scaleX - PADDLE_WIDTH / 2;
-        const nextX = clamp(targetX, 0, CANVAS_SIZE - PADDLE_WIDTH);
-        const playerPaddle = stateRef.current.playerPaddle;
-
-        playerPaddle.velocity = nextX - playerPaddle.x;
-        playerPaddle.x = nextX;
-    }, [canvasRef]);
+        setPlayerPaddleTarget(targetX);
+    }, [canvasRef, setPlayerPaddleTarget]);
 
     const handlePointerDelta = useCallback((deltaX: number) => {
         if (!stateRef.current || gameOverRef.current) return;
 
         const playerPaddle = stateRef.current.playerPaddle;
-        const nextX = clamp(playerPaddle.x + deltaX, 0, CANVAS_SIZE - PADDLE_WIDTH);
-        playerPaddle.velocity = nextX - playerPaddle.x;
-        playerPaddle.x = nextX;
-    }, []);
+        setPlayerPaddleTarget(playerPaddle.targetX + deltaX * PADDLE_POINTER_GAIN);
+    }, [setPlayerPaddleTarget]);
+
+    const renderPaddleTrail = (
+        ctx: CanvasRenderingContext2D,
+        paddle: Paddle,
+        y: number,
+        color: string,
+    ) => {
+        const velocityRatio = clamp(Math.abs(paddle.velocity) / PADDLE_MAX_TRAVEL_SPEED, 0, 1);
+        if (velocityRatio < 0.06) return;
+
+        for (let layer = 1; layer <= 3; layer += 1) {
+            ctx.globalAlpha = velocityRatio * (0.18 - layer * 0.04);
+            ctx.fillStyle = color;
+            maybeRoundRect(
+                ctx,
+                paddle.x - paddle.velocity * 0.42 * layer,
+                y,
+                paddle.width,
+                paddle.height,
+                8,
+            );
+            ctx.fill();
+        }
+
+        ctx.globalAlpha = 1;
+    };
 
     const restart = useCallback(() => {
         if (requestRef.current !== null) {
@@ -1050,6 +1134,7 @@ export const useGameLoop = (
         togglePause,
         handleMouseMove,
         handlePointerDelta,
+        handleTouchStart,
         handleTouchMove,
         isPaused,
         gameOver,

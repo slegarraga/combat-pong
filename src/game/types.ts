@@ -47,6 +47,8 @@ export interface Paddle {
     x: number;
     width: number;
     height: number;
+    /** Latched destination from the latest input sample. */
+    targetX: number;
     velocity: number;
 }
 

@@ -17,6 +17,12 @@ export const MATCH_DURATION = 90;
 export const PADDLE_WIDTH = 112;
 export const PADDLE_HEIGHT = 14;
 export const PADDLE_OFFSET = 18;
+export const PADDLE_TARGET_RESPONSE = 0.28;
+export const PADDLE_TARGET_BLEND = 0.42;
+export const PADDLE_MAX_TRAVEL_SPEED = 42;
+export const PADDLE_DAMPING = 0.86;
+export const PADDLE_POINTER_GAIN = 1.08;
+export const PADDLE_IMPACT_REFERENCE_SPEED = 24;
 
 /**
  * Core feel tuning.
