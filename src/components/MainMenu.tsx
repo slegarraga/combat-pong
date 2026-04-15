@@ -50,8 +50,8 @@ export const MainMenu = ({ onStartGame }: MainMenuProps) => {
                                 Own the board in 90 seconds.
                             </h1>
                             <p className="mt-6 max-w-xl text-lg leading-relaxed text-[var(--cp-muted)] sm:text-xl">
-                                Combat Pong is a frictionless territory duel built for instant understanding, sharp pressure,
-                                and immediate rematches.
+                                Combat Pong is a frictionless territory duel where clean returns charge the ball, rip through
+                                more tiles, and make every rematch feel deserved.
                             </p>
 
                             <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -164,14 +164,14 @@ export const MainMenu = ({ onStartGame }: MainMenuProps) => {
                                         Fast to read. Hard to drop.
                                     </p>
                                     <p className="mt-3 max-w-md text-sm leading-relaxed text-[var(--cp-muted)]">
-                                        Every clean return steals ground, every streak sharpens the pace, and every finish
-                                        is built to trigger another run.
+                                        Every clean return overcharges the next invasion, every streak sharpens the pace,
+                                        and every finish is built to trigger another run.
                                     </p>
                                 </div>
 
                                 <div className="cp-home-stage-tags mt-5">
                                     <span>90s rounds</span>
-                                    <span>Zero setup</span>
+                                    <span>Charged streaks</span>
                                     <span>Rematch loop</span>
                                 </div>
                             </div>

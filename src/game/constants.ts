@@ -18,11 +18,24 @@ export const PADDLE_WIDTH = 112;
 export const PADDLE_HEIGHT = 14;
 export const PADDLE_OFFSET = 18;
 
-export const MAX_SPEED = 12.8;
-export const MIN_SPEED = 4.6;
-export const BASE_ACCELERATION = 0.08;
+/**
+ * Core feel tuning.
+ *
+ * These values intentionally bias toward quick reads, fast escalation, and
+ * rewarding player streaks rather than slow attrition.
+ */
+export const OPENING_LAUNCH_SPEED = 6.3;
+export const MAX_SPEED = 14.4;
+export const MIN_SPEED = 5.1;
+export const BASE_ACCELERATION = 0.1;
+export const PLAYER_RETURN_BOOST = 0.72;
+export const RIVAL_RETURN_BOOST = 0.34;
+export const PLAYER_SPIN_FACTOR = 7.8;
+export const RIVAL_SPIN_FACTOR = 6.1;
+export const STREAK_SPEED_STEP = 0.18;
+export const MAX_CAPTURE_CHARGE = 4;
 export const BALL_RADIUS = TILE_SIZE / 2;
-export const TRAIL_LENGTH = 6;
+export const TRAIL_LENGTH = 7;
 
 export const COLORS = {
     background: '#050b14',

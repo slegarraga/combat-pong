@@ -16,12 +16,19 @@ import {
     DIFFICULTY,
     GRID_HEIGHT,
     GRID_WIDTH,
+    MAX_CAPTURE_CHARGE,
     MATCH_DURATION,
     MAX_SPEED,
     MIN_SPEED,
+    OPENING_LAUNCH_SPEED,
     PADDLE_HEIGHT,
     PADDLE_OFFSET,
     PADDLE_WIDTH,
+    PLAYER_RETURN_BOOST,
+    PLAYER_SPIN_FACTOR,
+    RIVAL_RETURN_BOOST,
+    RIVAL_SPIN_FACTOR,
+    STREAK_SPEED_STEP,
     TILE_SIZE,
     TRAIL_LENGTH,
 } from './constants';
@@ -194,7 +201,7 @@ export const useGameLoop = (
     };
 
     const createBall = useCallback((team: Team, pairIndex: number): Ball => {
-        const speed = 5.6 * difficultyConfig.speedMod;
+        const speed = OPENING_LAUNCH_SPEED * difficultyConfig.speedMod;
         return {
             id: `${team}-${pairIndex}-${Math.random().toString(36).slice(2, 8)}`,
             x: CANVAS_SIZE * (0.28 + Math.random() * 0.44),
@@ -205,6 +212,7 @@ export const useGameLoop = (
             vy: team === 'day' ? -speed : speed,
             team,
             speedMultiplier: 1,
+            captureCharge: 0,
             trail: [],
         };
     }, [difficultyConfig.speedMod]);
@@ -337,9 +345,14 @@ export const useGameLoop = (
         setStreak(streakRef.current);
         setBestStreak(bestStreakRef.current);
 
-        ball.speedMultiplier = clamp(1 + streakRef.current * 0.16, 1, 2.8);
+        ball.speedMultiplier = clamp(1 + streakRef.current * STREAK_SPEED_STEP, 1, 3.2);
+        ball.captureCharge = clamp(Math.floor(streakRef.current / 2), 0, MAX_CAPTURE_CHARGE);
 
-        if ([3, 6, 9].includes(streakRef.current)) {
+        if (streakRef.current === 2) {
+            narrate('Clean returns are charging the board.', 'positive', 0);
+        }
+
+        if ([4, 7, 10].includes(streakRef.current)) {
             narrate(getRivalFeedLine(state.rival, 'pressure'), 'positive', 0);
         }
     };
@@ -360,15 +373,19 @@ export const useGameLoop = (
     ) => {
         const hitOffset = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
         const paddleInfluence = paddle.velocity * 0.08;
-        const spin = hitOffset * (owner === 'player' ? 7.2 : 5.8) + paddleInfluence;
+        const spin = hitOffset * (owner === 'player' ? PLAYER_SPIN_FACTOR : RIVAL_SPIN_FACTOR) + paddleInfluence;
         const currentSpeed = Math.hypot(ball.vx, ball.vy);
-        const speedBoost = owner === 'player' ? 0.45 + Math.abs(hitOffset) * 0.45 : 0.24;
 
         if (owner === 'player') {
             awardPlayerStreak(state, ball);
         } else {
             ball.speedMultiplier = clamp(ball.speedMultiplier * (1 + state.rival.aggression * 0.03), 1, 2.2);
+            ball.captureCharge = clamp(Math.round(state.rival.aggression * 1.6) - 1, 0, 2);
         }
+
+        const speedBoost = owner === 'player'
+            ? PLAYER_RETURN_BOOST + Math.abs(hitOffset) * 0.54 + ball.captureCharge * 0.16
+            : RIVAL_RETURN_BOOST + state.rival.aggression * 0.12;
 
         const targetSpeed = clamp(
             currentSpeed + speedBoost,
@@ -385,8 +402,8 @@ export const useGameLoop = (
 
         const effectColor = ball.team === 'day' ? COLORS.dayAccent : COLORS.nightAccent;
         triggerShake(owner === 'player' ? 7 + Math.min(streakRef.current, 6) : 4);
-        emitParticles(ball.x, ball.y, effectColor, owner === 'player' ? 10 + streakRef.current : 7);
-        emitRing(ball.x, ball.y, effectColor, owner === 'player' ? 4.6 : 3.6);
+        emitParticles(ball.x, ball.y, effectColor, owner === 'player' ? 10 + streakRef.current + ball.captureCharge * 2 : 7);
+        emitRing(ball.x, ball.y, effectColor, owner === 'player' ? 4.8 + ball.captureCharge * 0.4 : 3.8);
     };
 
     const checkPaddleCollision = (
@@ -418,44 +435,84 @@ export const useGameLoop = (
         return true;
     };
 
+    /**
+     * Charged balls can rip through multiple nearby enemy tiles at once.
+     *
+     * This is the main satisfaction lever in the game: clean returns do not
+     * only make the rally faster, they also make each successful invasion feel
+     * dramatically more valuable.
+     */
     const detectTileCollision = (ball: Ball, ownership: Team[]) => {
         const enemyTeam: Team = ball.team === 'day' ? 'night' : 'day';
-        const minCol = clamp(Math.floor((ball.x - BALL_RADIUS) / TILE_SIZE), 0, GRID_WIDTH - 1);
-        const maxCol = clamp(Math.floor((ball.x + BALL_RADIUS) / TILE_SIZE), 0, GRID_WIDTH - 1);
-        const minRow = clamp(Math.floor((ball.y - BALL_RADIUS) / TILE_SIZE), 0, GRID_HEIGHT - 1);
-        const maxRow = clamp(Math.floor((ball.y + BALL_RADIUS) / TILE_SIZE), 0, GRID_HEIGHT - 1);
+        const centerCol = clamp(Math.floor(ball.x / TILE_SIZE), 0, GRID_WIDTH - 1);
+        const centerRow = clamp(Math.floor(ball.y / TILE_SIZE), 0, GRID_HEIGHT - 1);
+        const searchRadius = 1 + Math.min(ball.captureCharge, 2);
+        const maxDistance = TILE_SIZE * (1.2 + ball.captureCharge * 0.72);
+        const candidates: Array<{ col: number; row: number; index: number; distance: number }> = [];
 
-        for (let row = minRow; row <= maxRow; row += 1) {
-            for (let col = minCol; col <= maxCol; col += 1) {
+        for (let row = centerRow - searchRadius; row <= centerRow + searchRadius; row += 1) {
+            if (row < 0 || row >= GRID_HEIGHT) continue;
+            for (let col = centerCol - searchRadius; col <= centerCol + searchRadius; col += 1) {
+                if (col < 0 || col >= GRID_WIDTH) continue;
+
                 const index = col + row * GRID_WIDTH;
                 if (ownership[index] !== enemyTeam) continue;
 
-                ownership[index] = ball.team;
                 const tileCenterX = col * TILE_SIZE + TILE_SIZE / 2;
                 const tileCenterY = row * TILE_SIZE + TILE_SIZE / 2;
-                const dx = ball.x - tileCenterX;
-                const dy = ball.y - tileCenterY;
+                const distance = Math.hypot(ball.x - tileCenterX, ball.y - tileCenterY);
 
-                emitParticles(
-                    tileCenterX,
-                    tileCenterY,
-                    ball.team === 'day' ? COLORS.dayAccent : COLORS.nightAccent,
-                    4 + Math.round(ball.speedMultiplier * 2),
-                );
-                emitRing(tileCenterX, tileCenterY, ball.team === 'day' ? COLORS.dayAccent : COLORS.nightAccent, 2.8);
-
-                if (Math.abs(dx) > Math.abs(dy)) {
-                    ball.vx *= -1;
-                } else {
-                    ball.vy *= -1;
+                if (distance <= maxDistance) {
+                    candidates.push({ col, row, index, distance });
                 }
-                return;
             }
+        }
+
+        if (candidates.length === 0) {
+            return;
+        }
+
+        candidates.sort((left, right) => left.distance - right.distance);
+        const captureCount = Math.min(candidates.length, 1 + ball.captureCharge);
+        const primary = candidates[0];
+        const effectColor = ball.team === 'day' ? COLORS.dayAccent : COLORS.nightAccent;
+
+        for (let index = 0; index < captureCount; index += 1) {
+            const target = candidates[index];
+            ownership[target.index] = ball.team;
+
+            const tileCenterX = target.col * TILE_SIZE + TILE_SIZE / 2;
+            const tileCenterY = target.row * TILE_SIZE + TILE_SIZE / 2;
+            emitParticles(
+                tileCenterX,
+                tileCenterY,
+                effectColor,
+                index === 0 ? 5 + Math.round(ball.speedMultiplier * 2) : 3 + ball.captureCharge,
+            );
+            emitRing(tileCenterX, tileCenterY, effectColor, index === 0 ? 3.2 : 2.4);
+        }
+
+        if (captureCount > 1) {
+            triggerShake(3 + captureCount * 0.85);
+        }
+
+        ball.captureCharge = Math.max(0, ball.captureCharge - 1);
+
+        const primaryTileCenterX = primary.col * TILE_SIZE + TILE_SIZE / 2;
+        const primaryTileCenterY = primary.row * TILE_SIZE + TILE_SIZE / 2;
+        const dx = ball.x - primaryTileCenterX;
+        const dy = ball.y - primaryTileCenterY;
+
+        if (Math.abs(dx) > Math.abs(dy)) {
+            ball.vx *= -1;
+        } else {
+            ball.vy *= -1;
         }
     };
 
     const handleBoundaryMiss = (state: GameState, ball: Ball, owner: 'player' | 'rival') => {
         ball.speedMultiplier = 1;
+        ball.captureCharge = 0;
         ball.vx *= 0.86;
         ball.vy *= 0.86;
 
@@ -629,16 +686,25 @@ export const useGameLoop = (
 
         for (const ball of state.balls) {
             const ballColor = ball.team === 'day' ? COLORS.dayBall : COLORS.nightBall;
-            ctx.shadowBlur = 24;
+            const chargeGlow = ball.captureCharge * 10;
+            ctx.shadowBlur = 24 + chargeGlow;
             ctx.shadowColor = ballColor;
 
             ball.trail.forEach((point, index) => {
-                ctx.globalAlpha = point.alpha * 0.35;
+                ctx.globalAlpha = point.alpha * (0.32 + ball.captureCharge * 0.04);
                 ctx.fillStyle = ballColor;
                 ctx.beginPath();
                 ctx.arc(point.x, point.y, BALL_RADIUS * (1 - index * 0.08), 0, Math.PI * 2);
                 ctx.fill();
             });
+
+            if (ball.captureCharge > 0) {
+                ctx.globalAlpha = 0.14 + ball.captureCharge * 0.04;
+                ctx.fillStyle = ballColor;
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, BALL_RADIUS * (1.55 + ball.captureCharge * 0.12), 0, Math.PI * 2);
+                ctx.fill();
+            }
 
             ctx.globalAlpha = 1;
             ctx.fillStyle = ballColor;
@@ -772,9 +838,9 @@ export const useGameLoop = (
         syncScore(initialScore);
         syncTime(MATCH_DURATION);
 
-        updateFeedRef.current('Encrypted duel link secured.', 'neutral');
-        updateFeedRef.current(`${nextRival.alias} entered as ${nextRival.title}.`, 'positive');
-        updateFeedRef.current(nextRival.signature, 'neutral');
+        updateFeedRef.current('Clean returns overcharge your next board hits.', 'positive');
+        updateFeedRef.current('Hold more than half the arena when the horn lands.', 'neutral');
+        updateFeedRef.current(`${nextRival.alias} entered as ${nextRival.title}.`, 'neutral');
     }, [createBalls, difficulty]);
 
     const scheduleNextFrame = useCallback(() => {

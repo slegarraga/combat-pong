@@ -5,7 +5,7 @@
  * match summary handling, and local-only persistence/share flows.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useGameLoop } from './GameLoop';
 import { CANVAS_SIZE, COLORS, DIFFICULTY } from './constants';
 import { shareToTwitter } from './ShareCard';
@@ -56,6 +56,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
     const playerWon = dayPercent >= nightPercent;
     const margin = dayPercent - nightPercent;
     const difficultyMeta = DIFFICULTY[difficulty];
+    const surgeLevel = streak > 0 ? Math.min(4, Math.floor(streak / 2)) : 0;
 
     const formatTime = (seconds: number) => {
         const minutes = Math.floor(seconds / 60);
@@ -139,12 +140,12 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
         setHasRecordedGame(true);
     }, [bestStreak, dayPercent, difficulty, gameOver, hasRecordedGame, margin, playerWon, rival.alias]);
 
-    const handleRestart = () => {
+    const handleRestart = useCallback(() => {
         setHasRecordedGame(false);
         setShareStatus('idle');
         setStats(null);
         restart();
-    };
+    }, [restart]);
 
     const handleShare = async () => {
         setShareStatus('sharing');
@@ -176,6 +177,26 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
             ? 'Aim locked • press Esc to release'
             : 'Click once to lock aim';
     const quickActionCopy = isCoarsePointer ? 'Touch ready.' : 'Aim fast. Rematch faster.';
+
+    useEffect(() => {
+        const handleHotkeys = (event: KeyboardEvent) => {
+            if (event.repeat) return;
+
+            if (gameOver && (event.key === 'Enter' || event.key === ' ')) {
+                event.preventDefault();
+                handleRestart();
+                return;
+            }
+
+            if (!gameOver && (event.key === 'p' || event.key === 'P')) {
+                event.preventDefault();
+                togglePause();
+            }
+        };
+
+        window.addEventListener('keydown', handleHotkeys);
+        return () => window.removeEventListener('keydown', handleHotkeys);
+    }, [gameOver, handleRestart, togglePause]);
 
     return (
         <div className="min-h-screen min-h-[100dvh] overflow-hidden bg-[var(--cp-bg)] text-[var(--cp-text)]">
@@ -227,16 +248,16 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                                     <strong className="cp-stat-value" style={{ color: COLORS.dayAccent }}>{streak}x</strong>
                                 </div>
                                 <div className="cp-stat-card">
-                                    <span className="cp-stat-label">Best this match</span>
-                                    <strong className="cp-stat-value">{bestStreak}x</strong>
+                                    <span className="cp-stat-label">Board surge</span>
+                                    <strong className="cp-stat-value">{surgeLevel > 0 ? `+${surgeLevel}` : 'Idle'}</strong>
                                 </div>
                                 <div className="cp-stat-card">
                                     <span className="cp-stat-label">Tiles held</span>
                                     <strong className="cp-stat-value">{score.day}</strong>
                                 </div>
                                 <div className="cp-stat-card">
-                                    <span className="cp-stat-label">Match phase</span>
-                                    <strong className="cp-stat-value">{phase}</strong>
+                                    <span className="cp-stat-label">Best this match</span>
+                                    <strong className="cp-stat-value">{bestStreak}x</strong>
                                 </div>
                             </div>
                         </section>
@@ -245,7 +266,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                             <p className="cp-kicker">How it swings</p>
                             <ul className="space-y-3 text-sm leading-relaxed text-[var(--cp-muted)]">
                                 <li>Drive the lower paddle with your mouse or thumb.</li>
-                                <li>Clean returns build pressure and sharpen the next touch.</li>
+                                <li>Clean returns charge the ball so the next invasion flips more tiles.</li>
                                 <li>Finish above 50% territory when the horn lands.</li>
                             </ul>
                         </section>
@@ -364,7 +385,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                                                 </div>
                                             </div>
 
-                                            <div className="mt-5 space-y-3">
+                            <div className="mt-5 space-y-3">
                                                 <button
                                                     onClick={handleRestart}
                                                     className="btn-gradient w-full justify-center rounded-2xl px-5 py-4 text-base font-bold text-white"
@@ -378,6 +399,9 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                                                 >
                                                     {shareLabel}
                                                 </button>
+                                                <p className="text-center text-xs uppercase tracking-[0.18em] text-[var(--cp-dim)]">
+                                                    Press Enter for another run
+                                                </p>
                                             </div>
                                         </div>
                                     </div>

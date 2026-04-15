@@ -32,6 +32,13 @@ export interface Ball {
      * The player can snowball this aggressively with clean streak play.
      */
     speedMultiplier: number;
+    /**
+     * Extra tile captures awarded by clean returns.
+     *
+     * This is the core "feels amazing" mechanic: when the player stays in
+     * rhythm, each impact can rip through more territory than a normal touch.
+     */
+    captureCharge: number;
     trail: TrailPoint[];
 }
 
