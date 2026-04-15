@@ -18,6 +18,10 @@ interface GameCanvasProps {
     onBack?: () => void;
 }
 
+const arenaViewportStyle = {
+    maxWidth: 'min(100%, 72dvh, 42rem)',
+};
+
 const toneClassName: Record<'neutral' | 'positive' | 'warning', string> = {
     neutral: 'text-slate-200 border-white/10 bg-white/5',
     positive: 'text-emerald-200 border-emerald-400/20 bg-emerald-400/10',
@@ -228,77 +232,56 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
         <div className="min-h-screen min-h-[100dvh] overflow-hidden bg-[var(--cp-bg)] text-[var(--cp-text)]">
             <div className="cp-arena-noise fixed inset-0 pointer-events-none" />
             <div className="relative mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 py-4 sm:px-6 sm:py-6">
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-3">
-                        {onBack && (
-                            <button
-                                onClick={onBack}
-                                className="cp-chip min-h-[44px] rounded-full px-4 py-2 text-sm font-medium"
-                            >
-                                ← Exit arena
-                            </button>
-                        )}
-                        <div className="cp-chip rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.22em] text-[var(--cp-muted)]">
-                            Arena online
-                        </div>
-                        <button
-                            onClick={handleSoundToggle}
-                            className="cp-chip min-h-[44px] rounded-full px-4 py-2 text-[11px] uppercase tracking-[0.22em] text-[var(--cp-muted)] transition hover:text-white"
-                        >
-                            {soundEnabled ? 'Sound on' : 'Sound off'}
-                        </button>
-                    </div>
-                    <div
-                        className={`cp-timer-pill cp-display rounded-full border border-white/10 px-4 py-2 text-xl sm:text-2xl ${clutchActive ? 'cp-timer-pill-clutch' : ''} ${criticalActive ? 'cp-timer-pill-critical' : ''}`}
-                        style={{ color: timerColor }}
-                    >
-                        {formatTime(timeRemaining)}
-                    </div>
-                </div>
-
-                <main className="flex flex-1 items-center justify-center py-3 sm:py-6">
-                    <section className="w-full space-y-4">
-                        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                            <div className="max-w-2xl">
-                                <p className="cp-kicker">Matched rival</p>
-                                <div className="mt-2 flex flex-wrap items-center gap-3">
-                                    <h1 className="cp-display text-3xl font-black tracking-tight text-white sm:text-4xl">
-                                        {rival.alias}
-                                    </h1>
-                                    <span
-                                        className="rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em]"
-                                        style={{ borderColor: 'rgba(255, 111, 60, 0.25)', color: COLORS.dayAccent }}
-                                    >
-                                        {difficultyMeta.label}
-                                    </span>
-                                    <span className="cp-chip rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-[var(--cp-muted)]">
-                                        {rival.title}
-                                    </span>
-                                </div>
-                            </div>
-
+                <main className="flex flex-1 items-center justify-center py-1 sm:py-2">
+                    <section className="w-full space-y-3" style={arenaViewportStyle}>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex flex-wrap items-center gap-2">
-                                <div className="cp-chip rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-[var(--cp-muted)]">
-                                    Streak {streak}x
+                                {onBack && (
+                                    <button
+                                        onClick={onBack}
+                                        className="cp-chip min-h-[40px] rounded-full px-3.5 py-2 text-xs font-medium text-[var(--cp-muted)] transition hover:text-white"
+                                    >
+                                        ← Exit
+                                    </button>
+                                )}
+                                <div className="cp-chip rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.2em] text-white">
+                                    {rival.alias}
                                 </div>
-                                <div className="cp-chip rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-[var(--cp-muted)]">
-                                    Pulse {momentum}%
+                                <div
+                                    className="rounded-full border px-3 py-2 text-[11px] font-bold uppercase tracking-[0.22em]"
+                                    style={{ borderColor: 'rgba(255, 111, 60, 0.25)', color: COLORS.dayAccent }}
+                                >
+                                    {difficultyMeta.label}
                                 </div>
                                 <div className="cp-chip rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-[var(--cp-muted)]">
                                     {pingMs}ms
                                 </div>
+                                <button
+                                    onClick={handleSoundToggle}
+                                    className="cp-chip min-h-[40px] rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.22em] text-[var(--cp-muted)] transition hover:text-white"
+                                >
+                                    {soundEnabled ? 'Sound on' : 'Sound off'}
+                                </button>
+                            </div>
+                            <div
+                                className={`cp-timer-pill cp-display rounded-full border border-white/10 px-3.5 py-2 text-lg sm:text-xl ${clutchActive ? 'cp-timer-pill-clutch' : ''} ${criticalActive ? 'cp-timer-pill-critical' : ''}`}
+                                style={{ color: timerColor }}
+                            >
+                                {formatTime(timeRemaining)}
                             </div>
                         </div>
 
-                        <section className={`cp-panel cp-arena-stage p-3 sm:p-4 ${clutchActive ? 'cp-arena-stage-clutch' : ''} ${criticalActive ? 'cp-arena-stage-critical' : ''}`}>
-                            <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                                <div className="min-w-[220px]">
-                                    <div className="mb-2 flex items-center justify-between font-mono text-sm">
+                        <section
+                            className={`cp-panel cp-arena-stage p-2.5 sm:p-3 ${clutchActive ? 'cp-arena-stage-clutch' : ''} ${criticalActive ? 'cp-arena-stage-critical' : ''}`}
+                        >
+                            <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                                <div className="min-w-0 flex-1">
+                                    <div className="mb-2 flex items-center justify-between font-mono text-[12px]">
                                         <span style={{ color: COLORS.nightBall }}>{nightPercent}% rival</span>
                                         <span className="text-[var(--cp-dim)]">territory</span>
                                         <span style={{ color: COLORS.dayAccent }}>{dayPercent}% you</span>
                                     </div>
-                                    <div className="h-3 overflow-hidden rounded-full bg-black/40">
+                                    <div className="h-2.5 overflow-hidden rounded-full bg-black/40">
                                         <div className="flex h-full">
                                             <div style={{ width: `${nightPercent}%`, background: `linear-gradient(90deg, ${COLORS.night}, ${COLORS.nightAccent})` }} />
                                             <div style={{ width: `${dayPercent}%`, background: `linear-gradient(90deg, ${COLORS.dayAccent}, ${COLORS.day})` }} />
@@ -306,7 +289,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                                     </div>
                                 </div>
 
-                                <div className={`rounded-full border px-4 py-2 text-sm ${liveFeedToneClass}`}>
+                                <div className={`max-w-full rounded-full border px-3 py-2 text-[11px] uppercase tracking-[0.16em] ${liveFeedToneClass}`}>
                                     {phase} · {quickActionCopy}
                                 </div>
                             </div>
@@ -411,25 +394,41 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                                     </div>
                                 )}
                             </div>
+
+                            {!gameOver && (
+                                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className={`max-w-full truncate rounded-full border px-3 py-2 text-[11px] uppercase tracking-[0.14em] ${liveFeedToneClass}`}>
+                                        {liveFeedText}
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        <div className="cp-chip rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-[var(--cp-muted)]">
+                                            Streak {streak}x
+                                        </div>
+                                        <div className="cp-chip rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-[var(--cp-muted)]">
+                                            Pulse {momentum}%
+                                        </div>
+                                        <button
+                                            onClick={togglePause}
+                                            disabled={gameOver}
+                                            className="cp-button-secondary !min-h-[40px] px-4 py-2 text-sm disabled:opacity-50"
+                                        >
+                                            {isPaused ? 'Resume' : 'Pause'}
+                                        </button>
+                                        <button onClick={handleRestart} className="cp-button-secondary !min-h-[40px] px-4 py-2 text-sm">
+                                            Reset
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </section>
 
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className={`rounded-full border px-4 py-3 text-sm ${liveFeedToneClass}`}>
-                                {liveFeedText}
+                        {gameOver && (
+                            <div className="flex flex-wrap items-center justify-center gap-2">
+                                <div className={`rounded-full border px-3 py-2 text-[11px] uppercase tracking-[0.16em] ${liveFeedToneClass}`}>
+                                    {liveFeedText}
+                                </div>
                             </div>
-                            <div className="flex flex-wrap gap-3">
-                                <button
-                                    onClick={togglePause}
-                                    disabled={gameOver}
-                                    className="cp-button-secondary disabled:opacity-50"
-                                >
-                                    {isPaused ? 'Resume duel' : 'Pause duel'}
-                                </button>
-                                <button onClick={handleRestart} className="cp-button-secondary">
-                                    Reset board
-                                </button>
-                            </div>
-                        </div>
+                        )}
                     </section>
                 </main>
             </div>
