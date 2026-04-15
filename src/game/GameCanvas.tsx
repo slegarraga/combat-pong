@@ -59,7 +59,6 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
     const playerWon = dayPercent >= nightPercent;
     const margin = dayPercent - nightPercent;
     const difficultyMeta = DIFFICULTY[difficulty];
-    const surgeLevel = streak > 0 ? Math.min(4, Math.floor(streak / 2)) : 0;
     const clutchActive = timeRemaining <= 15;
     const criticalActive = timeRemaining <= 5;
 
@@ -193,17 +192,17 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
     const liveFeedText = liveFeed?.text ?? rival.signature;
     const liveFeedToneClass = liveFeed ? toneClassName[liveFeed.tone] : toneClassName.neutral;
     const pointerHint = isCoarsePointer
-        ? 'Drag to steer the lower paddle'
+        ? 'Drag anywhere on the board'
         : isPointerLocked
-            ? 'Aim locked • press Esc to release'
-            : 'Click once to lock aim';
+            ? 'Aim locked • Esc releases'
+            : 'Click board to lock aim';
     const quickActionCopy = criticalActive
-        ? 'Every touch can flip the finish.'
+        ? 'One clean touch flips it.'
         : clutchActive
-            ? 'The duel is speeding up.'
+            ? 'Angles matter now.'
             : isCoarsePointer
-                ? 'Drag low. Hit clean.'
-                : 'Swipe faster for heavier hits.';
+                ? 'Drag low. Cut wide.'
+                : 'Clip the edge for sharper exits.';
 
     useEffect(() => {
         const handleHotkeys = (event: KeyboardEvent) => {
@@ -276,23 +275,17 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                                         {rival.title}
                                     </span>
                                 </div>
-                                <p className="mt-3 max-w-xl text-sm leading-relaxed text-[var(--cp-muted)]">
-                                    {liveFeedText}
-                                </p>
                             </div>
 
                             <div className="flex flex-wrap items-center gap-2">
                                 <div className="cp-chip rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-[var(--cp-muted)]">
-                                    {pingMs}ms
-                                </div>
-                                <div className="cp-chip rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-[var(--cp-muted)]">
                                     Streak {streak}x
                                 </div>
                                 <div className="cp-chip rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-[var(--cp-muted)]">
-                                    Surge {surgeLevel > 0 ? `+${surgeLevel}` : 'idle'}
+                                    Pulse {momentum}%
                                 </div>
                                 <div className="cp-chip rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-[var(--cp-muted)]">
-                                    Pulse {momentum}%
+                                    {pingMs}ms
                                 </div>
                             </div>
                         </div>

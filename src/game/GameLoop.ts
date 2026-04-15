@@ -21,10 +21,15 @@ import {
     MAX_SPEED,
     MIN_SPEED,
     OPENING_LAUNCH_SPEED,
+    PADDLE_DAMPING,
+    PADDLE_EDGE_IMPACT_BONUS,
+    PADDLE_EDGE_SPEED_BONUS,
+    PADDLE_EDGE_SPIN_BONUS,
+    PADDLE_EDGE_WINDOW_RANGE,
+    PADDLE_EDGE_WINDOW_START,
     PADDLE_HEIGHT,
     PADDLE_IMPACT_REFERENCE_SPEED,
     PADDLE_OFFSET,
-    PADDLE_DAMPING,
     PADDLE_MAX_TRAVEL_SPEED,
     PADDLE_POINTER_GAIN,
     PADDLE_TARGET_BLEND,
@@ -475,9 +480,15 @@ export const useGameLoop = (
         owner: 'player' | 'rival',
     ) => {
         const hitOffset = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+        const edgeBias = Math.abs(hitOffset);
+        const edgePower = owner === 'player'
+            ? clamp((edgeBias - PADDLE_EDGE_WINDOW_START) / PADDLE_EDGE_WINDOW_RANGE, 0, 1)
+            : clamp((edgeBias - (PADDLE_EDGE_WINDOW_START + 0.1)) / (PADDLE_EDGE_WINDOW_RANGE + 0.12), 0, 0.42);
         const impactPower = clamp(Math.abs(paddle.velocity) / (owner === 'player' ? PADDLE_IMPACT_REFERENCE_SPEED : 26), 0, 1.35);
-        const paddleInfluence = paddle.velocity * (0.08 + impactPower * 0.035);
-        const spin = hitOffset * (owner === 'player' ? PLAYER_SPIN_FACTOR : RIVAL_SPIN_FACTOR) + paddleInfluence;
+        const edgeDirection = Math.sign(hitOffset) || Math.sign(paddle.velocity);
+        const paddleInfluence = paddle.velocity * (0.08 + impactPower * 0.035 + edgePower * 0.02);
+        const edgeSpinBoost = edgeDirection * edgePower * (PADDLE_EDGE_SPIN_BONUS + ball.captureCharge * 0.24 + impactPower * 0.9);
+        const spin = hitOffset * (owner === 'player' ? PLAYER_SPIN_FACTOR : RIVAL_SPIN_FACTOR) + paddleInfluence + edgeSpinBoost;
         const currentSpeed = Math.hypot(ball.vx, ball.vy);
 
         if (owner === 'player') {
@@ -492,14 +503,29 @@ export const useGameLoop = (
                     14 + impactPower * 4,
                 );
             }
+
+            if (edgePower > 0.72) {
+                if (edgePower > 0.92 && impactPower > 0.48) {
+                    ball.captureCharge = clamp(ball.captureCharge + 1, 0, MAX_CAPTURE_CHARGE);
+                }
+
+                emitFloatingText(
+                    'Edge cut',
+                    ball.x,
+                    ball.y - (impactPower > 0.82 ? 48 : 32),
+                    COLORS.dayAccent,
+                    13 + edgePower * 6,
+                );
+            }
         } else {
             ball.speedMultiplier = clamp(ball.speedMultiplier * (1 + state.rival.aggression * 0.03), 1, 2.2);
             ball.captureCharge = clamp(Math.round(state.rival.aggression * 1.6) - 1, 0, 2);
         }
 
+        const edgeSpeedBonus = edgePower * (PADDLE_EDGE_SPEED_BONUS + impactPower * PADDLE_EDGE_IMPACT_BONUS);
         const speedBoost = owner === 'player'
-            ? PLAYER_RETURN_BOOST + Math.abs(hitOffset) * 0.54 + ball.captureCharge * 0.16 + impactPower * 1.08
-            : RIVAL_RETURN_BOOST + state.rival.aggression * 0.12 + impactPower * 0.34;
+            ? PLAYER_RETURN_BOOST + Math.abs(hitOffset) * 0.54 + ball.captureCharge * 0.16 + impactPower * 1.08 + edgeSpeedBonus
+            : RIVAL_RETURN_BOOST + state.rival.aggression * 0.12 + impactPower * 0.34 + edgeSpeedBonus * 0.32;
 
         const targetSpeed = clamp(
             currentSpeed + speedBoost,
@@ -515,15 +541,34 @@ export const useGameLoop = (
         ball.vy *= ratio;
 
         const effectColor = ball.team === 'day' ? COLORS.dayAccent : COLORS.nightAccent;
-        const impactBurst = Math.round(impactPower * 6);
-        triggerShake(owner === 'player' ? 7 + Math.min(streakRef.current, 6) + impactPower * 6 : 4 + impactPower * 2.5);
-        emitParticles(ball.x, ball.y, effectColor, owner === 'player' ? 10 + streakRef.current + ball.captureCharge * 2 + impactBurst : 7 + impactBurst);
-        emitRing(ball.x, ball.y, effectColor, owner === 'player' ? 4.8 + ball.captureCharge * 0.4 + impactPower * 1.3 : 3.8 + impactPower * 0.6);
+        const expressiveImpact = clamp(impactPower + edgePower * PADDLE_EDGE_IMPACT_BONUS, 0, 1.45);
+        const impactBurst = Math.round(expressiveImpact * 6 + edgePower * 4);
+        triggerShake(
+            owner === 'player'
+                ? 7 + Math.min(streakRef.current, 6) + expressiveImpact * 6 + edgePower * 2.4
+                : 4 + expressiveImpact * 2.5 + edgePower,
+        );
+        emitParticles(
+            ball.x,
+            ball.y,
+            effectColor,
+            owner === 'player'
+                ? 10 + streakRef.current + ball.captureCharge * 2 + impactBurst
+                : 7 + impactBurst,
+        );
+        emitRing(
+            ball.x,
+            ball.y,
+            effectColor,
+            owner === 'player'
+                ? 4.8 + ball.captureCharge * 0.4 + expressiveImpact * 1.3 + edgePower * 0.6
+                : 3.8 + expressiveImpact * 0.6 + edgePower * 0.3,
+        );
         playPaddleImpactSound({
             owner,
             streak: streakRef.current,
             charge: ball.captureCharge,
-            impactPower,
+            impactPower: expressiveImpact,
             speed: targetSpeed,
         });
     };

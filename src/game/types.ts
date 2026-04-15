@@ -42,7 +42,12 @@ export interface Ball {
     trail: TrailPoint[];
 }
 
-/** Horizontal paddle state plus a cached velocity for richer rendering. */
+/**
+ * Horizontal paddle state.
+ *
+ * `targetX` lets input stay sticky to the board while `velocity` powers the
+ * richer rebound, trail, and impact feel.
+ */
 export interface Paddle {
     x: number;
     width: number;

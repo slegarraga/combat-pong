@@ -17,12 +17,24 @@ export const MATCH_DURATION = 90;
 export const PADDLE_WIDTH = 112;
 export const PADDLE_HEIGHT = 14;
 export const PADDLE_OFFSET = 18;
+/**
+ * Paddle feel tuning.
+ *
+ * The player paddle follows a latched target rather than snapping directly to
+ * the pointer. Edge-hit values tune how sharply expert contacts peel away from
+ * the paddle once the player clips the outer lanes.
+ */
 export const PADDLE_TARGET_RESPONSE = 0.28;
 export const PADDLE_TARGET_BLEND = 0.42;
 export const PADDLE_MAX_TRAVEL_SPEED = 42;
 export const PADDLE_DAMPING = 0.86;
 export const PADDLE_POINTER_GAIN = 1.08;
 export const PADDLE_IMPACT_REFERENCE_SPEED = 24;
+export const PADDLE_EDGE_WINDOW_START = 0.52;
+export const PADDLE_EDGE_WINDOW_RANGE = 0.4;
+export const PADDLE_EDGE_SPIN_BONUS = 3.2;
+export const PADDLE_EDGE_SPEED_BONUS = 0.82;
+export const PADDLE_EDGE_IMPACT_BONUS = 0.24;
 
 /**
  * Core feel tuning.
