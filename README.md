@@ -19,8 +19,8 @@ There are no accounts and no backend dependency in the critical gameplay loop. E
 - Removed all account, auth, matchmaking, storage, and realtime code.
 - Rebuilt the main game loop around faster anonymous duel pacing.
 - Upgraded the board feel with cleaner rendering, better trails, impact rings, particles, and stronger HUD feedback.
-- Moved player progression to a simple local-only stats model.
-- Reworked sharing so it generates assets locally instead of uploading them.
+- Moved player progression to a simple on-device stats model.
+- Reworked sharing so score cards are created on the fly with no upload step.
 - Updated UI copy and metadata so the product no longer claims real multiplayer.
 
 ## Tech stack
@@ -99,7 +99,7 @@ npm run preview
 4. Emits a lightweight “live duel” feed and fluctuating signal/ping values.
 5. Keeps React state updates focused on HUD values, while canvas rendering stays imperative.
 
-### Rival simulation
+### Rival system
 
 `src/game/rivals.ts` generates:
 

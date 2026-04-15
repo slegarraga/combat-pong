@@ -148,11 +148,11 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
     };
 
     const shareLabel = {
-        idle: 'Share this duel',
+        idle: 'Post your score',
         sharing: 'Preparing...',
-        shared: 'Shared natively',
-        copied: 'Copied + card saved',
-        downloaded: 'Card saved',
+        shared: 'Posted',
+        copied: 'Copied + saved',
+        downloaded: 'Saved locally',
     }[shareStatus];
 
     return (
@@ -322,8 +322,10 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                                                 {playerWon ? 'Arena secured' : 'Rival held firm'}
                                             </h2>
                                             <p className="mt-3 text-sm leading-relaxed text-[var(--cp-muted)]">
-                                                {rival.alias} finished {nightPercent}% to your {dayPercent}%.
-                                                {playerWon ? ' Clean finish.' : ' Queue the rematch immediately.'}
+                                                {playerWon
+                                                    ? `You put ${dayPercent}% on ${rival.alias}.`
+                                                    : `${rival.alias} closed it ${nightPercent}% to ${dayPercent}%.`}
+                                                {' '}Run it back fast or post the score.
                                             </p>
 
                                             <div className="mt-5 grid grid-cols-3 gap-3">

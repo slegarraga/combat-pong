@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;700;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;700;800&family=Manrope:wght@400;500;600;700;800&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -40,7 +40,7 @@ body {
     radial-gradient(circle at 82% 8%, rgba(79, 220, 255, 0.14), transparent 28%),
     linear-gradient(180deg, #08111b 0%, #050b14 52%, #07111d 100%);
   color: var(--cp-text);
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: "Manrope", system-ui, sans-serif;
 }
 
 body,
@@ -48,7 +48,7 @@ button,
 input,
 textarea,
 select {
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: "Manrope", system-ui, sans-serif;
 }
 
 #root {
@@ -105,6 +105,7 @@ select {
     transform 0.18s ease,
     box-shadow 0.18s ease,
     filter 0.18s ease;
+  font-family: "Bricolage Grotesque", "Manrope", sans-serif;
 }
 
 .btn-gradient:hover {
@@ -141,6 +142,10 @@ select {
   letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--cp-muted);
+}
+
+.cp-display {
+  font-family: "Bricolage Grotesque", "Manrope", sans-serif;
 }
 
 .cp-stat-card {
@@ -185,6 +190,115 @@ select {
   background:
     linear-gradient(135deg, rgba(255, 111, 60, 0.15), transparent 45%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03));
+}
+
+.cp-home-shell {
+  position: relative;
+}
+
+.cp-home-shell::before {
+  content: "";
+  position: absolute;
+  inset: 5rem 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+}
+
+.cp-home-stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 32%),
+    rgba(8, 14, 22, 0.72);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(18px);
+}
+
+.cp-home-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(255, 111, 60, 0.18), transparent 28%),
+    radial-gradient(circle at 80% 12%, rgba(79, 220, 255, 0.16), transparent 30%);
+  pointer-events: none;
+}
+
+.cp-home-board {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(8, 20, 32, 0.96), rgba(7, 15, 24, 0.96));
+  background-size: 28px 28px, 28px 28px, auto;
+  aspect-ratio: 1 / 1;
+}
+
+.cp-home-board::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(79, 220, 255, 0.12) 0 50%, rgba(255, 111, 60, 0.14) 50% 100%);
+}
+
+.cp-home-board::after {
+  content: "";
+  position: absolute;
+  inset: 50% 0 auto;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
+}
+
+.cp-home-orb {
+  position: absolute;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  box-shadow: 0 0 26px currentColor;
+}
+
+.cp-home-orb-day {
+  right: 18%;
+  bottom: 16%;
+  color: #ffe8cb;
+  background: #ffe8cb;
+}
+
+.cp-home-orb-night {
+  left: 20%;
+  top: 17%;
+  color: #d4f7ff;
+  background: #d4f7ff;
+}
+
+.cp-mode-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.cp-home-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.65rem;
+  color: var(--cp-dim);
+  font-size: 0.74rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.cp-home-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .cp-button-secondary {
