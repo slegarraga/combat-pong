@@ -15,6 +15,7 @@ import { PongHistoryPage, ChallengePage, HighScorePage, BrowserCompatPage, Updat
 import { UnblockedPage, WorkBreakPage, ReactionTimePage, OfflinePage, ArcadePage, AccessibilityPage } from './components/TargetedSEOPages';
 import { KidsPage, TwoPlayerPage, BestFreeGamesPage, NoDownloadPage, RelaxingPage, FocusPage } from './components/MoreTargetedSEOPages';
 import { BoredPage, WaitingRoomPage, LunchBreakPage, QuickGamesPage, AddictivePage, SoloPage, BallGamesPage, RetroPage, PaddleGamesPage, TerritoryPage, TimerGamesPage, SkillGamesPage } from './components/FinalSEOPages';
+import { primeArenaAudio } from './game/audio';
 import { GameCanvas } from './game/GameCanvas';
 import type { Difficulty } from './game/types';
 
@@ -178,6 +179,7 @@ function App() {
   };
 
   const startGame = (nextDifficulty: Difficulty) => {
+    void primeArenaAudio();
     setDifficulty(nextDifficulty);
     navigateTo('game');
   };

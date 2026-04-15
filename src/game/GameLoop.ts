@@ -32,6 +32,7 @@ import {
     TILE_SIZE,
     TRAIL_LENGTH,
 } from './constants';
+import { playFinishSound, playMissSound, playPaddleImpactSound, playTileBreakSound } from './audio';
 import { createRivalProfile, fluctuatePing, getRivalFeedLine } from './rivals';
 import type {
     Ball,
@@ -51,6 +52,15 @@ interface Particle {
     vx: number;
     vy: number;
     life: number;
+    color: string;
+    size: number;
+}
+
+interface FloatingText {
+    x: number;
+    y: number;
+    life: number;
+    text: string;
     color: string;
     size: number;
 }
@@ -98,6 +108,7 @@ export const useGameLoop = (
     const stateRef = useRef<GameState | null>(null);
     const particlesRef = useRef<Particle[]>([]);
     const ringsRef = useRef<ImpactRing[]>([]);
+    const floatingTextsRef = useRef<FloatingText[]>([]);
     const shakeRef = useRef({ x: 0, y: 0, intensity: 0 });
     const gameOverRef = useRef(false);
     const startTimeRef = useRef(0);
@@ -191,6 +202,17 @@ export const useGameLoop = (
         shakeRef.current.intensity = Math.max(shakeRef.current.intensity, intensity);
     };
 
+    const emitFloatingText = (text: string, x: number, y: number, color: string, size = 16) => {
+        floatingTextsRef.current.push({
+            x,
+            y,
+            life: 1,
+            text,
+            color,
+            size,
+        });
+    };
+
     const initOwnership = (): Team[] => {
         const ownership: Team[] = [];
         for (let index = 0; index < GRID_WIDTH * GRID_HEIGHT; index += 1) {
@@ -260,6 +282,16 @@ export const useGameLoop = (
 
             if (ring.alpha <= 0) {
                 ringsRef.current.splice(index, 1);
+            }
+        }
+
+        for (let index = floatingTextsRef.current.length - 1; index >= 0; index -= 1) {
+            const text = floatingTextsRef.current[index];
+            text.y -= 0.75 * delta;
+            text.life -= 0.03 * delta;
+
+            if (text.life <= 0) {
+                floatingTextsRef.current.splice(index, 1);
             }
         }
     };
@@ -348,6 +380,10 @@ export const useGameLoop = (
         ball.speedMultiplier = clamp(1 + streakRef.current * STREAK_SPEED_STEP, 1, 3.2);
         ball.captureCharge = clamp(Math.floor(streakRef.current / 2), 0, MAX_CAPTURE_CHARGE);
 
+        if (streakRef.current % 2 === 0 && ball.captureCharge > 0) {
+            emitFloatingText(`Charge +${ball.captureCharge}`, ball.x, ball.y - 18, COLORS.dayBall, 16 + ball.captureCharge);
+        }
+
         if (streakRef.current === 2) {
             narrate('Clean returns are charging the board.', 'positive', 0);
         }
@@ -404,6 +440,7 @@ export const useGameLoop = (
         triggerShake(owner === 'player' ? 7 + Math.min(streakRef.current, 6) : 4);
         emitParticles(ball.x, ball.y, effectColor, owner === 'player' ? 10 + streakRef.current + ball.captureCharge * 2 : 7);
         emitRing(ball.x, ball.y, effectColor, owner === 'player' ? 4.8 + ball.captureCharge * 0.4 : 3.8);
+        playPaddleImpactSound({ owner, streak: streakRef.current, charge: ball.captureCharge });
     };
 
     const checkPaddleCollision = (
@@ -494,8 +531,10 @@ export const useGameLoop = (
 
         if (captureCount > 1) {
             triggerShake(3 + captureCount * 0.85);
+            emitFloatingText(`${captureCount}-tile break`, ball.x, ball.y - 14, effectColor, 15 + captureCount);
         }
 
+        playTileBreakSound(captureCount, ball.team);
         ball.captureCharge = Math.max(0, ball.captureCharge - 1);
 
         const primaryTileCenterX = primary.col * TILE_SIZE + TILE_SIZE / 2;
@@ -520,12 +559,15 @@ export const useGameLoop = (
             resetPlayerStreak(state);
             triggerShake(9);
             emitParticles(ball.x, ball.y, COLORS.danger, 9);
+            emitFloatingText('Reset', ball.x, ball.y - 14, COLORS.danger, 15);
         } else {
             triggerShake(5);
             emitParticles(ball.x, ball.y, COLORS.nightAccent, 7);
+            emitFloatingText('Break', ball.x, ball.y - 14, COLORS.dayBall, 14);
             narrate(`${state.rival.alias} lost a clean read.`, 'positive', 0);
         }
         emitRing(ball.x, ball.y, owner === 'player' ? COLORS.danger : COLORS.nightAccent, 4.4);
+        playMissSound(owner);
     };
 
     const checkBoundaries = (state: GameState, ball: Ball) => {
@@ -655,6 +697,21 @@ export const useGameLoop = (
         }
         ctx.globalAlpha = 1;
 
+        const pulseGradient = ctx.createRadialGradient(
+            CANVAS_SIZE / 2,
+            CANVAS_SIZE / 2,
+            CANVAS_SIZE * 0.08,
+            CANVAS_SIZE / 2,
+            CANVAS_SIZE / 2,
+            CANVAS_SIZE * 0.64,
+        );
+        pulseGradient.addColorStop(0, 'rgba(255,255,255,0.10)');
+        pulseGradient.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.globalAlpha = 0.03 + momentumRef.current * 0.001 + (phaseRef.current === 'CLUTCH' ? 0.04 : 0);
+        ctx.fillStyle = pulseGradient;
+        ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+        ctx.globalAlpha = 1;
+
         for (const ring of ringsRef.current) {
             ctx.strokeStyle = ring.color;
             ctx.lineWidth = 2;
@@ -671,6 +728,18 @@ export const useGameLoop = (
             ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
             ctx.fill();
         }
+
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (const floatingText of floatingTextsRef.current) {
+            ctx.globalAlpha = floatingText.life;
+            ctx.fillStyle = floatingText.color;
+            ctx.shadowBlur = 18;
+            ctx.shadowColor = floatingText.color;
+            ctx.font = `700 ${floatingText.size}px "Bricolage Grotesque", sans-serif`;
+            ctx.fillText(floatingText.text, floatingText.x, floatingText.y);
+        }
+        ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
 
         ctx.shadowBlur = 20;
@@ -721,6 +790,7 @@ export const useGameLoop = (
         state.isRunning = false;
         setGameOver(true);
         triggerShake(10);
+        playFinishSound(state.dayScore >= state.nightScore);
 
         const winnerColor = state.dayScore >= state.nightScore ? COLORS.dayAccent : COLORS.nightAccent;
         for (let burst = 0; burst < 6; burst += 1) {
@@ -811,6 +881,7 @@ export const useGameLoop = (
 
         particlesRef.current = [];
         ringsRef.current = [];
+        floatingTextsRef.current = [];
         shakeRef.current = { x: 0, y: 0, intensity: 0 };
         gameOverRef.current = false;
         lastNarrationRef.current = 0;

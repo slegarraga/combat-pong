@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { isArenaAudioEnabled, primeArenaAudio, setArenaAudioEnabled } from './audio';
 import { useGameLoop } from './GameLoop';
 import { CANVAS_SIZE, COLORS, DIFFICULTY } from './constants';
 import { shareToTwitter } from './ShareCard';
@@ -49,6 +50,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
     const [stats, setStats] = useState<PlayerStats | null>(null);
     const [isPointerLocked, setIsPointerLocked] = useState(false);
     const [isCoarsePointer, setIsCoarsePointer] = useState(false);
+    const [soundEnabled, setSoundEnabledState] = useState(() => isArenaAudioEnabled());
 
     const total = score.day + score.night;
     const dayPercent = total > 0 ? Math.round((score.day / total) * 100) : 50;
@@ -159,10 +161,23 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
         setShareStatus(result);
     };
 
-    const lockCursorToArena = () => {
+    const handleSoundToggle = useCallback(() => {
+        const nextValue = !soundEnabled;
+        setSoundEnabledState(nextValue);
+        setArenaAudioEnabled(nextValue);
+    }, [soundEnabled]);
+
+    const handleArenaTouchStart = useCallback((event: React.TouchEvent<HTMLCanvasElement>) => {
+        event.preventDefault();
+        void primeArenaAudio();
+    }, []);
+
+    const lockCursorToArena = useCallback(() => {
+        void primeArenaAudio();
+
         if (gameOver || isPaused || isCoarsePointer) return;
         canvasRef.current?.requestPointerLock?.();
-    };
+    }, [gameOver, isCoarsePointer, isPaused]);
 
     const shareLabel = {
         idle: 'Share the board',
@@ -215,6 +230,12 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                         <div className="cp-chip rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.22em] text-[var(--cp-muted)]">
                             Arena online
                         </div>
+                        <button
+                            onClick={handleSoundToggle}
+                            className="cp-chip min-h-[44px] rounded-full px-4 py-2 text-[11px] uppercase tracking-[0.22em] text-[var(--cp-muted)] transition hover:text-white"
+                        >
+                            {soundEnabled ? 'Sound on' : 'Sound off'}
+                        </button>
                     </div>
                     <div
                         className="cp-timer-pill cp-display rounded-full border border-white/10 px-4 py-2 text-xl sm:text-2xl"
@@ -333,7 +354,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                                     onClick={lockCursorToArena}
                                     onMouseMove={isPointerLocked ? undefined : handleMouseMove}
                                     onTouchMove={handleTouchMove}
-                                    onTouchStart={(event) => event.preventDefault()}
+                                    onTouchStart={handleArenaTouchStart}
                                 />
 
                                 {!gameOver && (
@@ -385,7 +406,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                                                 </div>
                                             </div>
 
-                            <div className="mt-5 space-y-3">
+                                            <div className="mt-5 space-y-3">
                                                 <button
                                                     onClick={handleRestart}
                                                     className="btn-gradient w-full justify-center rounded-2xl px-5 py-4 text-base font-bold text-white"
