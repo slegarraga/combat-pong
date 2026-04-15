@@ -2,7 +2,7 @@
 
 Combat Pong is a territory-control arcade game inspired by [Pong Wars](https://github.com/vnglst/pong-wars), rebuilt around an **anonymous duel** fantasy.
 
-There are no accounts, no Supabase dependencies, and no real multiplayer backend anymore. Instead, every match generates a simulated rival with its own alias, timing profile, and pressure pattern so the game still feels like a live 1v1 without queue friction.
+There are no accounts and no backend dependency in the critical gameplay loop. Every match drops the player into an instant anonymous duel built for fast starts, sharp pressure, and repeat plays.
 
 **[Play now](https://www.combatpong.com)**
 
@@ -11,13 +11,13 @@ There are no accounts, no Supabase dependencies, and no real multiplayer backend
 - The board starts split between your side and the rival side.
 - Balls convert enemy tiles on impact.
 - Clean paddle returns build a streak and make your touches more dangerous.
-- The rival is simulated locally but tuned to feel reactive and human.
+- Every match introduces a fresh rival identity and pressure profile.
 - After 90 seconds, whoever controls more territory wins the duel.
 
 ## What changed
 
 - Removed all account, auth, matchmaking, storage, and realtime code.
-- Rebuilt the main game loop around anonymous rival personas.
+- Rebuilt the main game loop around faster anonymous duel pacing.
 - Upgraded the board feel with cleaner rendering, better trails, impact rings, particles, and stronger HUD feedback.
 - Moved player progression to a simple local-only stats model.
 - Reworked sharing so it generates assets locally instead of uploading them.

@@ -30,122 +30,120 @@ export const MainMenu = ({ onStartGame }: MainMenuProps) => {
     return (
         <div className="relative min-h-screen min-h-[100dvh] overflow-hidden bg-[var(--cp-bg)] text-[var(--cp-text)]">
             <div className="cp-home-bg fixed inset-0 pointer-events-none" />
-            <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-6 sm:px-6 sm:py-8">
-                <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
+            <div className="relative mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-6 sm:px-6 sm:py-8">
+                <header className="flex flex-wrap items-center justify-between gap-4">
                     <div className="cp-chip rounded-full px-4 py-2 text-[11px] uppercase tracking-[0.26em] text-[var(--cp-muted)]">
                         Anonymous duel arcade
                     </div>
-                    <nav className="flex flex-wrap items-center gap-3 text-sm text-[var(--cp-muted)]">
+                    <nav className="flex flex-wrap items-center gap-4 text-sm text-[var(--cp-muted)]">
                         <a href="/how-to-play" className="hover:text-white">How to play</a>
                         <a href="/tips" className="hover:text-white">Tips</a>
                         <a href="/faq" className="hover:text-white">FAQ</a>
-                        <a href="/multiplayer" className="hover:text-white">Duel guide</a>
                     </nav>
                 </header>
 
-                <main className="grid flex-1 gap-6 lg:grid-cols-[1.2fr,0.95fr]">
-                    <section className="cp-panel relative overflow-hidden">
-                        <div className="absolute -left-20 top-10 h-56 w-56 rounded-full bg-[radial-gradient(circle,_rgba(255,111,60,0.28),_transparent_68%)] blur-2xl" />
-                        <div className="absolute right-0 top-0 h-72 w-72 rounded-full bg-[radial-gradient(circle,_rgba(79,220,255,0.22),_transparent_66%)] blur-3xl" />
-                        <div className="relative max-w-3xl">
-                            <p className="cp-kicker">Queue-free competitive feel</p>
-                            <h1 className="mt-3 text-5xl font-black tracking-[-0.06em] text-white sm:text-6xl lg:text-7xl">
-                                Combat Pong
-                            </h1>
-                            <p className="mt-5 max-w-2xl text-lg leading-relaxed text-[var(--cp-muted)] sm:text-xl">
-                                A fake 1v1 that feels live: no account, no wait, just an anonymous rival,
-                                a brutal board split, and 90 seconds of increasingly nasty returns.
-                            </p>
+                <main className="flex flex-1 flex-col justify-center">
+                    <section className="mx-auto flex w-full max-w-4xl flex-col items-center text-center">
+                        <p className="cp-kicker">Fast, sharp, immediate</p>
+                        <h1 className="mt-4 text-6xl font-black tracking-[-0.08em] text-white sm:text-7xl lg:text-[6.5rem]">
+                            Combat Pong
+                        </h1>
+                        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-[var(--cp-muted)] sm:text-xl">
+                            One touch to start. Ninety seconds to take the board. Easy to learn, brutal to put down.
+                        </p>
 
-                            <div className="mt-8 grid gap-3 sm:grid-cols-3">
-                                <div className="cp-stat-card">
-                                    <span className="cp-stat-label">Instant rival</span>
-                                    <strong className="cp-stat-value text-lg">Generated locally</strong>
-                                </div>
-                                <div className="cp-stat-card">
-                                    <span className="cp-stat-label">Match length</span>
-                                    <strong className="cp-stat-value text-lg">90 seconds</strong>
-                                </div>
-                                <div className="cp-stat-card">
-                                    <span className="cp-stat-label">Input</span>
-                                    <strong className="cp-stat-value text-lg">Mouse + touch</strong>
-                                </div>
-                            </div>
+                        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+                            <button
+                                onClick={() => onStartGame('MEDIUM')}
+                                className="btn-gradient rounded-2xl px-7 py-4 text-base font-bold text-white"
+                            >
+                                Play Now
+                            </button>
+                            <a
+                                href="/how-to-play"
+                                className="cp-button-secondary rounded-2xl px-5 py-4"
+                            >
+                                Learn in 20 seconds
+                            </a>
+                        </div>
 
-                            {stats && (
-                                <div className="mt-8 grid gap-3 sm:grid-cols-4">
-                                    <div className="cp-stat-card">
-                                        <span className="cp-stat-label">Wins</span>
-                                        <strong className="cp-stat-value">{stats.wins}</strong>
-                                    </div>
-                                    <div className="cp-stat-card">
-                                        <span className="cp-stat-label">Win rate</span>
-                                        <strong className="cp-stat-value">{getWinRate(stats)}%</strong>
-                                    </div>
-                                    <div className="cp-stat-card">
-                                        <span className="cp-stat-label">Avg. territory</span>
-                                        <strong className="cp-stat-value">{getAverageTerritory(stats)}%</strong>
-                                    </div>
-                                    <div className="cp-stat-card">
-                                        <span className="cp-stat-label">Best streak</span>
-                                        <strong className="cp-stat-value">{stats.bestStreak}x</strong>
-                                    </div>
-                                </div>
-                            )}
+                        <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-xs uppercase tracking-[0.18em] text-[var(--cp-dim)]">
+                            <span>Instant entry</span>
+                            <span>•</span>
+                            <span>90-second matches</span>
+                            <span>•</span>
+                            <span>Mouse or touch</span>
+                            <span>•</span>
+                            <span>Instant rematches</span>
                         </div>
                     </section>
 
-                    <section className="space-y-4">
-                        <div className="cp-panel">
-                            <p className="cp-kicker">Choose your pressure level</p>
-                            <div className="mt-4 space-y-3">
-                                {difficultyOrder.map((difficulty) => {
-                                    const settings = DIFFICULTY[difficulty];
-                                    return (
-                                        <button
-                                            key={difficulty}
-                                            onClick={() => onStartGame(difficulty)}
-                                            className="cp-mode-card group w-full text-left"
-                                        >
-                                            <div>
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <h2 className="text-xl font-black text-white">{settings.label}</h2>
-                                                    <span className="text-xs uppercase tracking-[0.2em] text-[var(--cp-dim)]">
-                                                        {difficulty}
-                                                    </span>
-                                                </div>
-                                                <p className="mt-2 text-sm leading-relaxed text-[var(--cp-muted)]">
-                                                    {settings.subtitle}
-                                                </p>
-                                            </div>
-                                            <div className="mt-4 flex flex-wrap gap-2 text-xs uppercase tracking-[0.16em] text-[var(--cp-dim)]">
-                                                <span>{settings.ballPairs * 2} balls</span>
-                                                <span>•</span>
-                                                <span>{Math.round(settings.speedMod * 100)}% pace</span>
-                                                <span>•</span>
-                                                <span>{Math.round(settings.aiPrecision * 100)}% rival precision</span>
-                                            </div>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
+                    <section className="mx-auto mt-12 w-full max-w-5xl">
+                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                            {difficultyOrder.map((difficulty) => {
+                                const settings = DIFFICULTY[difficulty];
+                                const isDefault = difficulty === 'MEDIUM';
 
-                        <div className="cp-panel">
-                            <p className="cp-kicker">What changed</p>
-                            <div className="mt-4 space-y-3 text-sm leading-relaxed text-[var(--cp-muted)]">
-                                <p>No accounts. No Supabase. No real multiplayer infrastructure to slow the product down.</p>
-                                <p>The rival is fully simulated, anonymous, and tuned to feel more human under pressure.</p>
-                                <p>The board, HUD, and endgame loop are rebuilt around momentum swings and replay value.</p>
-                            </div>
+                                return (
+                                    <button
+                                        key={difficulty}
+                                        onClick={() => onStartGame(difficulty)}
+                                        className="cp-mode-card group w-full text-left"
+                                    >
+                                        <div className="flex items-center justify-between gap-3">
+                                            <h2 className="text-xl font-black text-white">{settings.label}</h2>
+                                            {isDefault ? (
+                                                <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-[var(--cp-muted)]">
+                                                    Start here
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs uppercase tracking-[0.2em] text-[var(--cp-dim)]">
+                                                    {difficulty}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="mt-3 text-sm leading-relaxed text-[var(--cp-muted)]">
+                                            {settings.subtitle}
+                                        </p>
+                                        <div className="mt-4 flex flex-wrap gap-2 text-xs uppercase tracking-[0.16em] text-[var(--cp-dim)]">
+                                            <span>{settings.ballPairs * 2} balls</span>
+                                            <span>•</span>
+                                            <span>{Math.round(settings.speedMod * 100)}% pace</span>
+                                        </div>
+                                    </button>
+                                );
+                            })}
                         </div>
                     </section>
+
+                    {stats && (
+                        <section className="mx-auto mt-8 w-full max-w-5xl">
+                            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                <div className="cp-stat-card">
+                                    <span className="cp-stat-label">Wins</span>
+                                    <strong className="cp-stat-value">{stats.wins}</strong>
+                                </div>
+                                <div className="cp-stat-card">
+                                    <span className="cp-stat-label">Win rate</span>
+                                    <strong className="cp-stat-value">{getWinRate(stats)}%</strong>
+                                </div>
+                                <div className="cp-stat-card">
+                                    <span className="cp-stat-label">Avg. territory</span>
+                                    <strong className="cp-stat-value">{getAverageTerritory(stats)}%</strong>
+                                </div>
+                                <div className="cp-stat-card">
+                                    <span className="cp-stat-label">Best streak</span>
+                                    <strong className="cp-stat-value">{stats.bestStreak}x</strong>
+                                </div>
+                            </div>
+                        </section>
+                    )}
                 </main>
 
                 <footer className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-white/6 pt-5 text-xs text-[var(--cp-dim)]">
                     <div className="flex flex-wrap items-center gap-3">
                         <a href="/about" className="hover:text-white">About</a>
-                        <a href="/two-player" className="hover:text-white">2-player feel</a>
+                        <a href="/multiplayer" className="hover:text-white">Duel guide</a>
                         <a href="/best-free" className="hover:text-white">Why it hits</a>
                     </div>
                     <p>

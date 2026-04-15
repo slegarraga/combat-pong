@@ -120,7 +120,7 @@ export const generateShareCard = async (data: ShareCardData): Promise<Blob> => {
 
     ctx.font = '600 24px "Space Grotesk", sans-serif';
     ctx.fillStyle = COLORS.textMuted;
-    ctx.fillText('No login. No queue. Just a savage fake 1v1.', 730, 396);
+    ctx.fillText('No login. No queue. Just instant duel pressure.', 730, 396);
     ctx.fillText('combatpong.com', 730, 438);
 
     return new Promise((resolve, reject) => {

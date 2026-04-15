@@ -111,7 +111,7 @@ export const TwoPlayerPage = ({ onBack, onPlay }: SEOPageProps) => {
     useEffect(() => {
         document.title = '2 Player Pong Feel Online - Combat Pong Anonymous Duel | Play Free';
         const metaDesc = document.querySelector('meta[name="description"]');
-        if (metaDesc) metaDesc.setAttribute('content', 'Want a 2-player pong feeling without signup friction? Combat Pong creates an anonymous rival instantly so every match feels like a tense 1v1. Free browser game.');
+        if (metaDesc) metaDesc.setAttribute('content', 'Want a 2-player pong feeling without signup friction? Combat Pong throws you into instant anonymous duels built for tense 1v1 energy. Free browser game.');
         return () => { document.title = 'Combat Pong - Free Online Territory Control Game'; };
     }, []);
 
@@ -133,7 +133,7 @@ export const TwoPlayerPage = ({ onBack, onPlay }: SEOPageProps) => {
                         2-Player Pong Feel
                     </h1>
                     <p className="text-gray-400 text-sm sm:text-base">
-                        Built to feel like a live rival without requiring one.
+                        Built for live-rival pressure and instant rematches.
                     </p>
                 </div>
 
@@ -141,7 +141,7 @@ export const TwoPlayerPage = ({ onBack, onPlay }: SEOPageProps) => {
                     <section className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-xl p-4 sm:p-6">
                         <h2 className="font-bold text-lg text-blue-400 mb-3">⚡ Anonymous Duel Energy</h2>
                         <p className="text-gray-300 text-sm mb-3">
-                            Combat Pong now creates a convincing 1v1 feeling locally:
+                            Combat Pong is built to drop you into a convincing 1v1 instantly:
                         </p>
                         <ul className="text-gray-300 text-sm space-y-2">
                             <li>• <strong>No queue</strong> - Tap play and a rival appears instantly</li>
@@ -155,8 +155,8 @@ export const TwoPlayerPage = ({ onBack, onPlay }: SEOPageProps) => {
                         <h2 className="font-bold text-lg mb-3">🎮 How 2-Player Works</h2>
                         <ol className="text-gray-300 text-sm space-y-2 list-decimal list-inside">
                             <li>Choose a difficulty that matches how brutal you want the duel to feel</li>
-                            <li>The game generates a rival alias, title, and signal readout</li>
-                            <li>The simulated rival responds like a real opponent under pressure</li>
+                            <li>Your opponent enters with a call-sign, title, and signal readout</li>
+                            <li>The pressure ramps up hard as the duel gets tighter</li>
                             <li>Out-control the board before the 90-second clock expires</li>
                             <li>Run it back instantly if the finish gets ugly</li>
                         </ol>

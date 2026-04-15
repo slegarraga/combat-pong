@@ -21,11 +21,11 @@ export const FAQPage = ({ onBack, onPlay }: SEOPageProps) => {
         { q: 'How do I win a match?', a: 'Each match lasts 90 seconds. When time runs out, whoever controls more than 50% of the territory wins! Hit balls with your paddle to speed them up and conquer faster.' },
         { q: 'How does the streak system work?', a: 'Consecutive paddle hits build a streak! Each hit adds +0.25x to your ball\'s speed (1st hit = 1.25x, 2nd = 1.5x, 3rd = 1.75x... it keeps stacking!). Miss and hit the wall? Your ball slows to 0.85x and streak resets to 0.' },
         { q: 'Can I play on mobile?', a: 'Absolutely! Combat Pong is fully optimized for mobile devices with touch controls. Works on any smartphone or tablet browser - no app needed.' },
-        { q: 'Is Combat Pong real multiplayer?', a: 'Not anymore. Combat Pong now simulates an anonymous rival locally so the match feels like a live 1v1 without logins, queues, or backend lag.' },
+        { q: 'Does Combat Pong have 1v1 duels?', a: 'Yes. Combat Pong drops you straight into fast anonymous duels with no login, no waiting, and no extra setup.' },
         { q: 'What are the difficulty levels?', a: 'There are 4 modes: Easy (2 slow balls), Medium (2 normal balls), Hard (4 fast balls), and Nightmare (6 very fast balls). All are 90-second matches.' },
         { q: 'What browsers are supported?', a: 'Combat Pong works on all modern browsers: Chrome, Firefox, Safari, Edge, and their mobile versions. No plugins required.' },
         { q: 'How do I control the paddle?', a: 'On desktop, move your mouse left/right. On mobile, touch the screen and drag your finger. The paddle follows your input.' },
-        { q: 'Who created Combat Pong?', a: 'Combat Pong was inspired by the viral "Pong Wars" concept. We rebuilt it around sharper controls, stronger game feel, anonymous rival simulation, and mobile-first play.' }
+        { q: 'Who created Combat Pong?', a: 'Combat Pong was inspired by the viral "Pong Wars" concept. We rebuilt it around sharper controls, stronger game feel, instant duels, and mobile-first play.' }
     ];
 
     return (
@@ -129,7 +129,7 @@ export const AboutPage = ({ onBack, onPlay }: SEOPageProps) => {
                         <p>
                             Combat Pong was inspired by the viral "Pong Wars" concept that captivated millions online.
                             We took that mesmerizing territory battle and rebuilt it around paddle control, difficulty tuning,
-                            stronger audiovisual feedback, and a simulated anonymous rival that preserves the tension of a 1v1 without the friction of real matchmaking.
+                            stronger audiovisual feedback, and instant anonymous duels that keep the tension high from the first touch.
                         </p>
                     </section>
 
@@ -145,9 +145,8 @@ export const AboutPage = ({ onBack, onPlay }: SEOPageProps) => {
                     <section>
                         <h2 className="text-xl sm:text-2xl font-bold text-white mb-3">⚡ Anonymous Duel Mode</h2>
                         <p>
-                            Combat Pong now leans fully into instant anonymous duels. The rival is simulated locally,
-                            but the HUD, pacing, signal readout, and behavior tuning are designed to feel like you dropped
-                            into a live 1v1 with zero queue time and zero account setup.
+                            Combat Pong now leans fully into instant anonymous duels. The HUD, pacing, signal readout,
+                            and pressure swings are all designed to make every match feel immediate, intense, and easy to jump into.
                         </p>
                     </section>
                 </article>
@@ -266,9 +265,9 @@ export const TipsPage = ({ onBack, onPlay }: SEOPageProps) => {
 // =============== MULTIPLAYER PAGE ===============
 export const MultiplayerInfoPage = ({ onBack }: SEOPageProps) => {
     useEffect(() => {
-        document.title = 'Combat Pong Anonymous Duel Mode - Instant 1v1 Feel | No Login';
+        document.title = 'Combat Pong Anonymous Duel Mode - Instant 1v1 Action | No Login';
         const metaDesc = document.querySelector('meta[name="description"]');
-        if (metaDesc) metaDesc.setAttribute('content', 'Enter Combat Pong anonymous duel mode. Instant 1v1 feel, no login, no matchmaking, no backend. Just fast local rivalry and savage territory swings.');
+        if (metaDesc) metaDesc.setAttribute('content', 'Enter Combat Pong anonymous duel mode. Instant 1v1 action, no login, no waiting, and brutal territory swings built for quick rematches.');
         return () => { document.title = 'Combat Pong - Free Online Territory Control Game'; };
     }, []);
 
@@ -290,7 +289,7 @@ export const MultiplayerInfoPage = ({ onBack }: SEOPageProps) => {
                         Anonymous Duel Mode
                     </h1>
                     <p className="text-gray-400 text-sm sm:text-lg">
-                        The pressure of a live 1v1, rebuilt as a local instant-play ritual.
+                        Instant 1v1 pressure with zero friction.
                     </p>
                 </div>
 
@@ -298,20 +297,20 @@ export const MultiplayerInfoPage = ({ onBack }: SEOPageProps) => {
                     <section className="bg-white/5 rounded-xl p-4 sm:p-6">
                         <h2 className="text-lg font-bold text-white mb-2">🎮 How It Works</h2>
                         <ol className="list-decimal list-inside space-y-2">
-                            <li>Open the game and choose a difficulty instantly</li>
-                            <li>A rival alias and duel profile are generated on the spot</li>
-                            <li>The top paddle reacts like an aggressive anonymous opponent</li>
-                            <li>Push the board in your favor before the 90-second timer ends</li>
-                            <li>No login, no queue, no external service required</li>
+                            <li>Hit play and enter the arena immediately</li>
+                            <li>Your opponent arrives with a live call-sign and pressure profile</li>
+                            <li>Fight for territory before the 90-second clock expires</li>
+                            <li>Use streaks to accelerate the pace and break the board open</li>
+                            <li>Run it back instantly if the ending gets messy</li>
                         </ol>
                     </section>
 
                     <section className="bg-white/5 rounded-xl p-4 sm:p-6">
                         <h2 className="text-lg font-bold text-white mb-2">⚡ Features</h2>
                         <ul className="space-y-2">
-                            <li>✓ Anonymous rival alias, title, and signal profile every match</li>
-                            <li>✓ Human-like pressure swings without network delay</li>
-                            <li>✓ Queue-free rematches and local-only persistence</li>
+                            <li>✓ Instant anonymous duels with a fresh opponent identity every match</li>
+                            <li>✓ Pressure swings that escalate hard as streaks build</li>
+                            <li>✓ One-tap rematches and persistent career stats</li>
                             <li>✓ Stronger bounce, streak, particle, and momentum feedback</li>
                             <li>✓ Mobile and desktop friendly controls</li>
                         </ul>
@@ -321,8 +320,8 @@ export const MultiplayerInfoPage = ({ onBack }: SEOPageProps) => {
                         <h2 className="text-lg font-bold text-white mb-2">🏆 Win Conditions</h2>
                         <p>
                             Both sides fight for board control by converting tiles on impact. When the timer hits zero,
-                            the side with more territory wins. The fake rival is tuned to feel unstable under pressure,
-                            so late swings happen constantly if your streak gets rolling.
+                            the side with more territory wins. Momentum turns fast, so one hot streak can completely
+                            flip the ending in the final seconds.
                         </p>
                     </section>
                 </div>

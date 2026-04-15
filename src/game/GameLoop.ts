@@ -808,6 +808,15 @@ export const useGameLoop = (
         playerPaddle.x = nextX;
     }, [canvasRef]);
 
+    const handlePointerDelta = useCallback((deltaX: number) => {
+        if (!stateRef.current || gameOverRef.current) return;
+
+        const playerPaddle = stateRef.current.playerPaddle;
+        const nextX = clamp(playerPaddle.x + deltaX, 0, CANVAS_SIZE - PADDLE_WIDTH);
+        playerPaddle.velocity = nextX - playerPaddle.x;
+        playerPaddle.x = nextX;
+    }, []);
+
     const restart = useCallback(() => {
         if (requestRef.current !== null) {
             cancelAnimationFrame(requestRef.current);
@@ -854,6 +863,7 @@ export const useGameLoop = (
         restart,
         togglePause,
         handleMouseMove,
+        handlePointerDelta,
         handleTouchMove,
         isPaused,
         gameOver,

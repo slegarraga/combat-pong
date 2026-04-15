@@ -33,6 +33,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
         restart,
         togglePause,
         handleMouseMove,
+        handlePointerDelta,
         handleTouchMove,
         isPaused,
         gameOver,
@@ -46,6 +47,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
     const [shareStatus, setShareStatus] = useState<'idle' | 'sharing' | 'shared' | 'copied' | 'downloaded'>('idle');
     const [hasRecordedGame, setHasRecordedGame] = useState(false);
     const [stats, setStats] = useState<PlayerStats | null>(null);
+    const [isPointerLocked, setIsPointerLocked] = useState(false);
 
     const total = score.day + score.night;
     const dayPercent = total > 0 ? Math.round((score.day / total) * 100) : 50;
@@ -67,11 +69,43 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
             : COLORS.text;
 
     useEffect(() => {
+        const canvas = canvasRef.current;
         document.body.classList.add('game-active');
         return () => {
+            if (document.pointerLockElement === canvas) {
+                document.exitPointerLock?.();
+            }
             document.body.classList.remove('game-active');
         };
     }, []);
+
+    useEffect(() => {
+        const handlePointerLockChange = () => {
+            setIsPointerLocked(document.pointerLockElement === canvasRef.current);
+        };
+
+        const handleLockedMouseMove = (event: MouseEvent) => {
+            if (document.pointerLockElement !== canvasRef.current || !canvasRef.current) return;
+
+            const rect = canvasRef.current.getBoundingClientRect();
+            const scaleX = CANVAS_SIZE / rect.width;
+            handlePointerDelta(event.movementX * scaleX);
+        };
+
+        document.addEventListener('pointerlockchange', handlePointerLockChange);
+        document.addEventListener('mousemove', handleLockedMouseMove);
+
+        return () => {
+            document.removeEventListener('pointerlockchange', handlePointerLockChange);
+            document.removeEventListener('mousemove', handleLockedMouseMove);
+        };
+    }, [handlePointerDelta]);
+
+    useEffect(() => {
+        if ((gameOver || isPaused) && document.pointerLockElement === canvasRef.current) {
+            document.exitPointerLock?.();
+        }
+    }, [gameOver, isPaused]);
 
     useEffect(() => {
         if (!gameOver || hasRecordedGame) return;
@@ -106,6 +140,11 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
             bestStreak,
         });
         setShareStatus(result);
+    };
+
+    const lockCursorToArena = () => {
+        if (gameOver || isPaused) return;
+        canvasRef.current?.requestPointerLock?.();
     };
 
     const shareLabel = {
@@ -248,10 +287,19 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                                     width={CANVAS_SIZE}
                                     height={CANVAS_SIZE}
                                     className="relative z-[1] aspect-square w-full cursor-none touch-none rounded-[22px]"
-                                    onMouseMove={handleMouseMove}
+                                    onClick={lockCursorToArena}
+                                    onMouseMove={isPointerLocked ? undefined : handleMouseMove}
                                     onTouchMove={handleTouchMove}
                                     onTouchStart={(event) => event.preventDefault()}
                                 />
+
+                                {!gameOver && (
+                                    <div className="pointer-events-none absolute inset-x-5 bottom-4 z-10 flex justify-center">
+                                        <div className="cp-chip rounded-full px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-[var(--cp-muted)]">
+                                            {isPointerLocked ? 'Cursor locked • press Esc to release' : 'Click board to lock cursor'}
+                                        </div>
+                                    </div>
+                                )}
 
                                 {isPaused && !gameOver && (
                                     <div className="absolute inset-0 z-20 flex items-center justify-center rounded-[22px] bg-black/70 backdrop-blur">
@@ -305,7 +353,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                                                     onClick={handleRestart}
                                                     className="btn-gradient w-full justify-center rounded-2xl px-5 py-4 text-base font-bold text-white"
                                                 >
-                                                    Queue another fake rival
+                                                    Instant rematch
                                                 </button>
                                             </div>
                                         </div>
@@ -326,7 +374,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                                 Reset board
                             </button>
                             <div className="cp-chip rounded-full px-4 py-3 text-sm text-[var(--cp-muted)]">
-                                No login. No queue. Fully anonymous.
+                                Tap, play, rematch.
                             </div>
                         </div>
                     </main>
