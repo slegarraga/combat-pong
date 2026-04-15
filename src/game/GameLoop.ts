@@ -32,7 +32,7 @@ import {
     TILE_SIZE,
     TRAIL_LENGTH,
 } from './constants';
-import { playFinishSound, playMissSound, playPaddleImpactSound, playTileBreakSound } from './audio';
+import { playClutchEnterSound, playClutchPulseSound, playFinishSound, playMissSound, playPaddleImpactSound, playTileBreakSound } from './audio';
 import { createRivalProfile, fluctuatePing, getRivalFeedLine } from './rivals';
 import type {
     Ball,
@@ -116,12 +116,14 @@ export const useGameLoop = (
     const pauseTimeRef = useRef(0);
     const lastNarrationRef = useRef(0);
     const lastPingShiftRef = useRef(0);
+    const lastCountdownCueRef = useRef<number | null>(null);
     const bestStreakRef = useRef(0);
     const streakRef = useRef(0);
     const scoreCacheRef = useRef<ScoreSnapshot>({ day: 0, night: 0 });
     const timeCacheRef = useRef(MATCH_DURATION);
     const phaseRef = useRef<'OPENING' | 'MIDGAME' | 'CLUTCH'>('OPENING');
     const momentumRef = useRef(12);
+    const clutchDriveRef = useRef(0);
     const leadStateRef = useRef<'neutral' | 'player' | 'rival'>('neutral');
     const feedRef = useRef<FeedEvent[]>([]);
     const difficultyConfig = DIFFICULTY[difficulty];
@@ -310,11 +312,15 @@ export const useGameLoop = (
     const updateMomentum = (state: GameState, remaining: number, currentTime: number) => {
         const lead = state.dayScore - state.nightScore;
         const nextPhase = remaining > 60 ? 'OPENING' : remaining > 24 ? 'MIDGAME' : 'CLUTCH';
+        const clutchDrive = remaining <= 15 ? clamp((15 - remaining) / 15, 0, 1) : 0;
+        clutchDriveRef.current = clutchDrive;
 
         if (nextPhase !== phaseRef.current) {
             phaseRef.current = nextPhase;
             setPhase(nextPhase);
             if (nextPhase === 'CLUTCH') {
+                emitFloatingText('Clutch', CANVAS_SIZE / 2, CANVAS_SIZE / 2 - 24, COLORS.warning, 34);
+                playClutchEnterSound();
                 narrate(getRivalFeedLine(state.rival, 'clutch'), 'warning', 0);
             }
         }
@@ -345,6 +351,22 @@ export const useGameLoop = (
             lastPingShiftRef.current = currentTime;
             state.rival.pingMs = fluctuatePing(state.rival, difficulty);
             setPingMs(state.rival.pingMs);
+        }
+
+        const roundedRemaining = Math.ceil(remaining);
+        if (roundedRemaining <= 10 && roundedRemaining > 0 && roundedRemaining !== lastCountdownCueRef.current) {
+            lastCountdownCueRef.current = roundedRemaining;
+            playClutchPulseSound(roundedRemaining);
+
+            if ([10, 5, 3, 1].includes(roundedRemaining)) {
+                emitFloatingText(
+                    roundedRemaining === 10 ? 'Final 10' : `${roundedRemaining}`,
+                    CANVAS_SIZE / 2,
+                    CANVAS_SIZE * 0.28,
+                    roundedRemaining <= 3 ? COLORS.danger : COLORS.warning,
+                    roundedRemaining <= 3 ? 30 : 24,
+                );
+            }
         }
     };
 
@@ -613,13 +635,14 @@ export const useGameLoop = (
     };
 
     const updateBallPhysics = (ball: Ball, delta: number) => {
-        const acceleration = BASE_ACCELERATION * difficultyConfig.speedMod;
+        const clutchDrive = clutchDriveRef.current;
+        const acceleration = BASE_ACCELERATION * difficultyConfig.speedMod * (1 + clutchDrive * 1.55);
         ball.vx += (Math.random() - 0.5) * acceleration * delta;
         ball.vy += (Math.random() - 0.5) * acceleration * 0.55 * delta;
 
         const speed = Math.hypot(ball.vx, ball.vy) || 1;
-        const maxSpeed = MAX_SPEED * difficultyConfig.speedMod * ball.speedMultiplier;
-        const minSpeed = MIN_SPEED * difficultyConfig.speedMod;
+        const maxSpeed = MAX_SPEED * difficultyConfig.speedMod * ball.speedMultiplier * (1 + clutchDrive * 0.16);
+        const minSpeed = MIN_SPEED * difficultyConfig.speedMod * (1 + clutchDrive * 0.12);
 
         if (speed > maxSpeed) {
             const scale = maxSpeed / speed;
@@ -654,7 +677,7 @@ export const useGameLoop = (
             targetX = projected - aiPaddle.width / 2 + aggressionBias + wobble;
         }
 
-        const reactionBoost = phaseRef.current === 'CLUTCH' ? 1.15 : 1;
+        const reactionBoost = phaseRef.current === 'CLUTCH' ? 1.15 + clutchDriveRef.current * 0.18 : 1;
         const desiredX = clamp(targetX, 0, CANVAS_SIZE - aiPaddle.width);
         const previousX = aiPaddle.x;
         aiPaddle.x += (desiredX - aiPaddle.x) * state.rival.reaction * reactionBoost * delta;
@@ -725,10 +748,16 @@ export const useGameLoop = (
         );
         pulseGradient.addColorStop(0, 'rgba(255,255,255,0.10)');
         pulseGradient.addColorStop(1, 'rgba(255,255,255,0)');
-        ctx.globalAlpha = 0.03 + momentumRef.current * 0.001 + (phaseRef.current === 'CLUTCH' ? 0.04 : 0);
+        ctx.globalAlpha = 0.03 + momentumRef.current * 0.001 + (phaseRef.current === 'CLUTCH' ? 0.04 + clutchDriveRef.current * 0.07 : 0);
         ctx.fillStyle = pulseGradient;
         ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
         ctx.globalAlpha = 1;
+
+        if (phaseRef.current === 'CLUTCH') {
+            ctx.strokeStyle = `rgba(255, 190, 107, ${0.08 + clutchDriveRef.current * 0.18})`;
+            ctx.lineWidth = 10 + clutchDriveRef.current * 6;
+            ctx.strokeRect(6, 6, CANVAS_SIZE - 12, CANVAS_SIZE - 12);
+        }
 
         for (const ring of ringsRef.current) {
             ctx.strokeStyle = ring.color;
@@ -907,6 +936,8 @@ export const useGameLoop = (
         bestStreakRef.current = 0;
         streakRef.current = 0;
         leadStateRef.current = 'neutral';
+        clutchDriveRef.current = 0;
+        lastCountdownCueRef.current = null;
         phaseRef.current = 'OPENING';
         momentumRef.current = 12;
         scoreCacheRef.current = initialScore;

@@ -190,6 +190,54 @@ export const playPaddleImpactSound = ({
     });
 };
 
+export const playClutchEnterSound = () => {
+    withAudio((context) => {
+        playVoice(context, {
+            frequency: 240,
+            endFrequency: 320,
+            duration: 0.12,
+            gain: 0.022,
+            type: 'triangle',
+        });
+        playVoice(context, {
+            frequency: 320,
+            endFrequency: 440,
+            duration: 0.11,
+            gain: 0.018,
+            type: 'square',
+            delay: 0.05,
+        });
+    });
+};
+
+export const playClutchPulseSound = (secondsLeft: number) => {
+    withAudio((context) => {
+        const urgent = secondsLeft <= 5;
+        const baseFrequency = urgent
+            ? 220 + (5 - secondsLeft) * 26
+            : 176 + (10 - secondsLeft) * 8;
+
+        playVoice(context, {
+            frequency: baseFrequency,
+            endFrequency: baseFrequency * (urgent ? 1.22 : 1.08),
+            duration: urgent ? 0.12 : 0.08,
+            gain: urgent ? 0.022 : 0.014,
+            type: urgent ? 'square' : 'triangle',
+        });
+
+        if (urgent) {
+            playVoice(context, {
+                frequency: baseFrequency * 0.72,
+                endFrequency: baseFrequency * 0.86,
+                duration: 0.08,
+                gain: 0.012,
+                type: 'sine',
+                delay: 0.035,
+            });
+        }
+    });
+};
+
 export const playTileBreakSound = (captureCount: number, team: 'day' | 'night') => {
     withAudio((context) => {
         const frequency = team === 'day' ? 170 + captureCount * 34 : 145 + captureCount * 24;

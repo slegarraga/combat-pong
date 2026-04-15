@@ -59,6 +59,8 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
     const margin = dayPercent - nightPercent;
     const difficultyMeta = DIFFICULTY[difficulty];
     const surgeLevel = streak > 0 ? Math.min(4, Math.floor(streak / 2)) : 0;
+    const clutchActive = timeRemaining <= 15;
+    const criticalActive = timeRemaining <= 5;
 
     const formatTime = (seconds: number) => {
         const minutes = Math.floor(seconds / 60);
@@ -194,7 +196,13 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
         : isPointerLocked
             ? 'Aim locked • press Esc to release'
             : 'Click once to lock aim';
-    const quickActionCopy = isCoarsePointer ? 'Drag low. Hit clean.' : 'Swipe faster for heavier hits.';
+    const quickActionCopy = criticalActive
+        ? 'Every touch can flip the finish.'
+        : clutchActive
+            ? 'The duel is speeding up.'
+            : isCoarsePointer
+                ? 'Drag low. Hit clean.'
+                : 'Swipe faster for heavier hits.';
 
     useEffect(() => {
         const handleHotkeys = (event: KeyboardEvent) => {
@@ -241,7 +249,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                         </button>
                     </div>
                     <div
-                        className="cp-timer-pill cp-display rounded-full border border-white/10 px-4 py-2 text-xl sm:text-2xl"
+                        className={`cp-timer-pill cp-display rounded-full border border-white/10 px-4 py-2 text-xl sm:text-2xl ${clutchActive ? 'cp-timer-pill-clutch' : ''} ${criticalActive ? 'cp-timer-pill-critical' : ''}`}
                         style={{ color: timerColor }}
                     >
                         {formatTime(timeRemaining)}
@@ -288,7 +296,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                             </div>
                         </div>
 
-                        <section className="cp-panel p-3 sm:p-4">
+                        <section className={`cp-panel cp-arena-stage p-3 sm:p-4 ${clutchActive ? 'cp-arena-stage-clutch' : ''} ${criticalActive ? 'cp-arena-stage-critical' : ''}`}>
                             <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                                 <div className="min-w-[220px]">
                                     <div className="mb-2 flex items-center justify-between font-mono text-sm">
@@ -310,6 +318,13 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                             </div>
 
                             <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-black/20 p-2 shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
+                                {clutchActive && !gameOver && (
+                                    <div className="pointer-events-none absolute inset-x-0 top-14 z-10 flex justify-center">
+                                        <div className={`cp-chip rounded-full px-4 py-2 text-[11px] uppercase tracking-[0.2em] ${criticalActive ? 'text-rose-100' : 'text-amber-100'}`}>
+                                            {criticalActive ? `Final ${timeRemaining}s` : 'Clutch'}
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="absolute inset-x-5 top-4 z-10 flex justify-between text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--cp-muted)]">
                                     <span>Rival territory</span>
                                     <span>Your territory</span>
