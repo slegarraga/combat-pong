@@ -11,7 +11,7 @@ export const FAQPage = ({ onBack, onPlay }: SEOPageProps) => {
     useEffect(() => {
         document.title = 'Combat Pong FAQ - Frequently Asked Questions | Free Online Game';
         const metaDesc = document.querySelector('meta[name="description"]');
-        if (metaDesc) metaDesc.setAttribute('content', 'Find answers to common Combat Pong questions. Learn about game modes, controls, multiplayer, mobile play, and more. Get help with our free browser game!');
+        if (metaDesc) metaDesc.setAttribute('content', 'Find answers to common Combat Pong questions. Learn about anonymous duel mode, controls, mobile play, and more. Get help with our free browser game!');
         return () => { document.title = 'Combat Pong - Free Online Territory Control Game'; };
     }, []);
 
@@ -21,11 +21,11 @@ export const FAQPage = ({ onBack, onPlay }: SEOPageProps) => {
         { q: 'How do I win a match?', a: 'Each match lasts 90 seconds. When time runs out, whoever controls more than 50% of the territory wins! Hit balls with your paddle to speed them up and conquer faster.' },
         { q: 'How does the streak system work?', a: 'Consecutive paddle hits build a streak! Each hit adds +0.25x to your ball\'s speed (1st hit = 1.25x, 2nd = 1.5x, 3rd = 1.75x... it keeps stacking!). Miss and hit the wall? Your ball slows to 0.85x and streak resets to 0.' },
         { q: 'Can I play on mobile?', a: 'Absolutely! Combat Pong is fully optimized for mobile devices with touch controls. Works on any smartphone or tablet browser - no app needed.' },
-        { q: 'How do I play multiplayer?', a: 'Login with your Google account, click "Find Match" and you\'ll be paired with another player for real-time 1v1 battles. First to 90% territory wins!' },
+        { q: 'Is Combat Pong real multiplayer?', a: 'Not anymore. Combat Pong now simulates an anonymous rival locally so the match feels like a live 1v1 without logins, queues, or backend lag.' },
         { q: 'What are the difficulty levels?', a: 'There are 4 modes: Easy (2 slow balls), Medium (2 normal balls), Hard (4 fast balls), and Nightmare (6 very fast balls). All are 90-second matches.' },
         { q: 'What browsers are supported?', a: 'Combat Pong works on all modern browsers: Chrome, Firefox, Safari, Edge, and their mobile versions. No plugins required.' },
         { q: 'How do I control the paddle?', a: 'On desktop, move your mouse left/right. On mobile, touch the screen and drag your finger. The paddle follows your input.' },
-        { q: 'Who created Combat Pong?', a: 'Combat Pong was inspired by the viral "Pong Wars" concept. We enhanced it with gameplay mechanics, multiplayer, and mobile optimization.' }
+        { q: 'Who created Combat Pong?', a: 'Combat Pong was inspired by the viral "Pong Wars" concept. We rebuilt it around sharper controls, stronger game feel, anonymous rival simulation, and mobile-first play.' }
     ];
 
     return (
@@ -128,8 +128,8 @@ export const AboutPage = ({ onBack, onPlay }: SEOPageProps) => {
                         <h2 className="text-xl sm:text-2xl font-bold text-white mb-3">🌟 Inspiration</h2>
                         <p>
                             Combat Pong was inspired by the viral "Pong Wars" concept that captivated millions online.
-                            We took that mesmerizing territory battle and added gameplay elements: paddle control, lives system,
-                            difficulty modes, and real-time multiplayer to create a game you can actually play and master.
+                            We took that mesmerizing territory battle and rebuilt it around paddle control, difficulty tuning,
+                            stronger audiovisual feedback, and a simulated anonymous rival that preserves the tension of a 1v1 without the friction of real matchmaking.
                         </p>
                     </section>
 
@@ -143,11 +143,11 @@ export const AboutPage = ({ onBack, onPlay }: SEOPageProps) => {
                     </section>
 
                     <section>
-                        <h2 className="text-xl sm:text-2xl font-bold text-white mb-3">⚡ Real-Time Multiplayer</h2>
+                        <h2 className="text-xl sm:text-2xl font-bold text-white mb-3">⚡ Anonymous Duel Mode</h2>
                         <p>
-                            Challenge players from around the world in real-time 1v1 battles. Our multiplayer system
-                            uses cutting-edge technology for instant matchmaking and lag-free gameplay.
-                            Login with Google and find a match in seconds.
+                            Combat Pong now leans fully into instant anonymous duels. The rival is simulated locally,
+                            but the HUD, pacing, signal readout, and behavior tuning are designed to feel like you dropped
+                            into a live 1v1 with zero queue time and zero account setup.
                         </p>
                     </section>
                 </article>
@@ -266,9 +266,9 @@ export const TipsPage = ({ onBack, onPlay }: SEOPageProps) => {
 // =============== MULTIPLAYER PAGE ===============
 export const MultiplayerInfoPage = ({ onBack }: SEOPageProps) => {
     useEffect(() => {
-        document.title = 'Combat Pong Multiplayer - Play 1v1 Online Free | Real-Time PvP';
+        document.title = 'Combat Pong Anonymous Duel Mode - Instant 1v1 Feel | No Login';
         const metaDesc = document.querySelector('meta[name="description"]');
-        if (metaDesc) metaDesc.setAttribute('content', 'Battle real players in Combat Pong multiplayer! Real-time 1v1 matches, instant matchmaking, no lag. Login with Google and find a match in seconds. Free to play!');
+        if (metaDesc) metaDesc.setAttribute('content', 'Enter Combat Pong anonymous duel mode. Instant 1v1 feel, no login, no matchmaking, no backend. Just fast local rivalry and savage territory swings.');
         return () => { document.title = 'Combat Pong - Free Online Territory Control Game'; };
     }, []);
 
@@ -287,10 +287,10 @@ export const MultiplayerInfoPage = ({ onBack }: SEOPageProps) => {
                 <div className="text-center mb-8">
                     <span className="text-5xl sm:text-6xl mb-4 block">⚡</span>
                     <h1 className="text-2xl sm:text-4xl font-black mb-4">
-                        Combat Pong Multiplayer
+                        Anonymous Duel Mode
                     </h1>
                     <p className="text-gray-400 text-sm sm:text-lg">
-                        Battle real players in real-time 1v1 territory wars!
+                        The pressure of a live 1v1, rebuilt as a local instant-play ritual.
                     </p>
                 </div>
 
@@ -298,41 +298,41 @@ export const MultiplayerInfoPage = ({ onBack }: SEOPageProps) => {
                     <section className="bg-white/5 rounded-xl p-4 sm:p-6">
                         <h2 className="text-lg font-bold text-white mb-2">🎮 How It Works</h2>
                         <ol className="list-decimal list-inside space-y-2">
-                            <li>Login with your Google account</li>
-                            <li>Click "Find Match" on the main menu</li>
-                            <li>Get matched with a player instantly</li>
-                            <li>Battle in real-time to control territory</li>
-                            <li>First to 90% territory wins!</li>
+                            <li>Open the game and choose a difficulty instantly</li>
+                            <li>A rival alias and duel profile are generated on the spot</li>
+                            <li>The top paddle reacts like an aggressive anonymous opponent</li>
+                            <li>Push the board in your favor before the 90-second timer ends</li>
+                            <li>No login, no queue, no external service required</li>
                         </ol>
                     </section>
 
                     <section className="bg-white/5 rounded-xl p-4 sm:p-6">
                         <h2 className="text-lg font-bold text-white mb-2">⚡ Features</h2>
                         <ul className="space-y-2">
-                            <li>✓ Real-time gameplay with zero lag</li>
-                            <li>✓ Instant matchmaking</li>
-                            <li>✓ HARD difficulty speed (challenging!)</li>
-                            <li>✓ 2 balls - one for each player</li>
-                            <li>✓ Works on mobile and desktop</li>
+                            <li>✓ Anonymous rival alias, title, and signal profile every match</li>
+                            <li>✓ Human-like pressure swings without network delay</li>
+                            <li>✓ Queue-free rematches and local-only persistence</li>
+                            <li>✓ Stronger bounce, streak, particle, and momentum feedback</li>
+                            <li>✓ Mobile and desktop friendly controls</li>
                         </ul>
                     </section>
 
                     <section className="bg-white/5 rounded-xl p-4 sm:p-6">
                         <h2 className="text-lg font-bold text-white mb-2">🏆 Win Conditions</h2>
                         <p>
-                            Each player controls their own ball. Conquer tiles by hitting them with your ball.
-                            The first player to control 90% of the board wins the match.
-                            Territory can change hands rapidly, so stay focused until the very end!
+                            Both sides fight for board control by converting tiles on impact. When the timer hits zero,
+                            the side with more territory wins. The fake rival is tuned to feel unstable under pressure,
+                            so late swings happen constantly if your streak gets rolling.
                         </p>
                     </section>
                 </div>
 
                 <div className="mt-8 sm:mt-12 space-y-3">
                     <a href="/" className="btn-gradient w-full py-4 min-h-[56px] rounded-xl font-bold text-white touch-manipulation block text-center">
-                        Find a Match Now
+                        Enter an Anonymous Duel
                     </a>
                     <p className="text-center text-gray-500 text-xs">
-                        Requires Google login for matchmaking
+                        Instant play. No login required.
                     </p>
                 </div>
             </main>
@@ -352,7 +352,7 @@ const Footer = () => (
                 <a href="/tips" className="hover:text-white">Tips & Tricks</a>
                 <a href="/faq" className="hover:text-white">FAQ</a>
                 <a href="/about" className="hover:text-white">About</a>
-                <a href="/multiplayer" className="hover:text-white">Multiplayer</a>
+                <a href="/multiplayer" className="hover:text-white">Anonymous Duel</a>
             </nav>
             <nav className="flex flex-wrap justify-center gap-3 text-xs text-gray-600 mb-4">
                 <a href="/mode/easy" className="hover:text-white">Easy Mode</a>

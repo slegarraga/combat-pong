@@ -388,7 +388,7 @@ export const UpdatesPage = ({ onBack, onPlay }: SEOPageProps) => {
                 'Paddle control for Day team',
                 'AI opponent for Night team',
                 'Mobile touch controls',
-                'Real-time multiplayer (beta)',
+                'Prototype anonymous rival mode',
             ]
         },
     ];

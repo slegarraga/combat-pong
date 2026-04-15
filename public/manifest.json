@@ -1,11 +1,11 @@
 {
     "name": "Combat Pong",
     "short_name": "Combat Pong",
-    "description": "The most addictive territory control game. Battle AI or friends in real-time multiplayer!",
+    "description": "The most addictive territory control game. Face an anonymous rival instantly with no login or queue.",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#1a1a2e",
-    "theme_color": "#7b2cbf",
+    "theme_color": "#050b14",
     "orientation": "portrait",
     "icons": [
         {

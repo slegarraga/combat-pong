@@ -20,7 +20,7 @@ export const SEOFooter: React.FC<SEOFooterProps> = ({ currentPage }) => {
                     {isNotCurrent('/tips') && <a href="/tips" className={linkClass}>💡 Tips & Tricks</a>}
                     {isNotCurrent('/faq') && <a href="/faq" className={linkClass}>❓ FAQ</a>}
                     {isNotCurrent('/about') && <a href="/about" className={linkClass}>ℹ️ About</a>}
-                    {isNotCurrent('/multiplayer') && <a href="/multiplayer" className={linkClass}>⚡ Multiplayer</a>}
+                    {isNotCurrent('/multiplayer') && <a href="/multiplayer" className={linkClass}>⚡ Anonymous Duel</a>}
                 </nav>
 
                 {/* Game Modes */}

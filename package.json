@@ -1,7 +1,7 @@
 {
   "name": "combat-pong",
   "version": "1.0.0",
-  "description": "A territory control game inspired by Pong Wars. Battle AI or play real-time multiplayer — conquer 50%+ of the board in 90 seconds to win.",
+  "description": "An anonymous-duel territory control game inspired by Pong Wars. Conquer more than 50% of the board in 90 seconds to win.",
   "license": "MIT",
   "type": "module",
   "homepage": "https://www.combatpong.com",
@@ -16,12 +16,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
+    "@types/node": "^24.5.2",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",

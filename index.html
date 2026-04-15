@@ -7,12 +7,12 @@
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 
   <!-- Primary Meta Tags -->
-  <title>Combat Pong - Free Online Territory Control Game | Play Now</title>
-  <meta name="title" content="Combat Pong - Free Online Territory Control Game | Play Now" />
+  <title>Combat Pong - Anonymous Duel Territory Game | Play Now</title>
+  <meta name="title" content="Combat Pong - Anonymous Duel Territory Game | Play Now" />
   <meta name="description"
-    content="Play Combat Pong free online! Control your paddle, conquer territory, and battle against AI or friends in real-time multiplayer. The most addictive browser game of 2025." />
+    content="Play Combat Pong free online. Control your paddle, conquer territory, and face an anonymous rival instantly with no login, no queue, and no download." />
   <meta name="keywords"
-    content="combat pong, pong game, online pong, browser game, territory game, multiplayer pong, free game, arcade game, paddle game, ball game" />
+    content="combat pong, anonymous duel, pong game, browser game, territory game, free game, arcade game, paddle game, ball game" />
   <meta name="author" content="Combat Pong" />
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
   <meta name="googlebot" content="index, follow" />
@@ -22,9 +22,9 @@
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://www.combatpong.com/" />
-  <meta property="og:title" content="Combat Pong - Free Online Territory Control Game" />
+  <meta property="og:title" content="Combat Pong - Anonymous Duel Territory Game" />
   <meta property="og:description"
-    content="The most addictive browser game! Control territory, battle AI, or challenge friends in real-time multiplayer. Play free now!" />
+    content="The most addictive browser game for instant anonymous duels. Control territory, pressure the rival, and play free now." />
   <meta property="og:image" content="https://www.combatpong.com/og-image.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
@@ -35,9 +35,9 @@
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:url" content="https://www.combatpong.com/" />
-  <meta name="twitter:title" content="Combat Pong - Free Online Territory Control Game" />
+  <meta name="twitter:title" content="Combat Pong - Anonymous Duel Territory Game" />
   <meta name="twitter:description"
-    content="The most addictive browser game! Control territory, battle AI, or challenge friends." />
+    content="Control territory, pressure an anonymous rival, and play instantly." />
   <meta name="twitter:image" content="https://www.combatpong.com/og-image.png" />
   <meta name="twitter:image:alt" content="Combat Pong Gameplay" />
   <meta name="twitter:creator" content="@combatpong" />
@@ -54,20 +54,16 @@
   <meta name="application-name" content="Combat Pong" />
   <meta name="msapplication-TileColor" content="#1a1a2e" />
 
-  <!-- Preconnect for Performance -->
-  <link rel="preconnect" href="https://msqckqodpahvtedoziqs.supabase.co" />
-  <link rel="dns-prefetch" href="https://msqckqodpahvtedoziqs.supabase.co" />
-
   <!-- JSON-LD Structured Data -->
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "VideoGame",
       "name": "Combat Pong",
-      "description": "A territory control game where you battle against AI or friends in real-time multiplayer matches. Control your paddle, protect your balls, and conquer the board!",
+      "description": "A territory control game built around instant anonymous duels. Control your paddle, protect your balls, and conquer the board!",
       "url": "https://www.combatpong.com/",
       "image": "https://www.combatpong.com/og-image.png",
-      "genre": ["Arcade", "Action", "Multiplayer"],
+      "genre": ["Arcade", "Action", "Strategy"],
       "gamePlatform": ["Web Browser", "Mobile Browser"],
       "applicationCategory": "Game",
       "operatingSystem": "Any",
@@ -80,11 +76,11 @@
         "@type": "Organization",
         "name": "Combat Pong"
       },
-      "playMode": ["SinglePlayer", "MultiPlayer"],
+      "playMode": "SinglePlayer",
       "numberOfPlayers": {
         "@type": "QuantitativeValue",
         "minValue": 1,
-        "maxValue": 2
+        "maxValue": 1
       }
     }
     </script>
@@ -121,10 +117,10 @@
         },
         {
           "@type": "Question",
-          "name": "How does multiplayer work?",
+          "name": "Is Combat Pong real multiplayer?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Login with Google, click 'Find Match', and get paired with another player for real-time 1v1 battles. First to control 90% of territory wins!"
+            "text": "Combat Pong now simulates an anonymous rival locally, giving each match a live 1v1 feeling without login, matchmaking, or backend services."
           }
         }
       ]
@@ -157,10 +153,8 @@
     /* Prevent overscroll bounce on iOS */
     html,
     body {
-      position: fixed;
-      overflow: hidden;
-      width: 100%;
-      height: 100%;
+      overflow-x: hidden;
+      min-height: 100%;
       overscroll-behavior: none;
       -webkit-overflow-scrolling: touch;
       touch-action: manipulation;

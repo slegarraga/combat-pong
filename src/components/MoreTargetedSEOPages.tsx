@@ -109,9 +109,9 @@ export const KidsPage = ({ onBack, onPlay }: SEOPageProps) => {
 // =============== TWO PLAYER / LOCAL MULTIPLAYER PAGE ===============
 export const TwoPlayerPage = ({ onBack, onPlay }: SEOPageProps) => {
     useEffect(() => {
-        document.title = '2 Player Pong Game Online - Combat Pong Multiplayer | Play Free';
+        document.title = '2 Player Pong Feel Online - Combat Pong Anonymous Duel | Play Free';
         const metaDesc = document.querySelector('meta[name="description"]');
-        if (metaDesc) metaDesc.setAttribute('content', 'Play 2 player pong online! Combat Pong multiplayer: real-time 1v1 battles, find match instantly. Challenge friends or randoms. Free browser game!');
+        if (metaDesc) metaDesc.setAttribute('content', 'Want a 2-player pong feeling without signup friction? Combat Pong creates an anonymous rival instantly so every match feels like a tense 1v1. Free browser game.');
         return () => { document.title = 'Combat Pong - Free Online Territory Control Game'; };
     }, []);
 
@@ -130,46 +130,46 @@ export const TwoPlayerPage = ({ onBack, onPlay }: SEOPageProps) => {
                 <div className="text-center mb-8">
                     <span className="text-5xl mb-4 block">👥</span>
                     <h1 className="text-2xl sm:text-4xl font-black mb-4">
-                        2 Player Pong Online
+                        2-Player Pong Feel
                     </h1>
                     <p className="text-gray-400 text-sm sm:text-base">
-                        Battle real players in real-time!
+                        Built to feel like a live rival without requiring one.
                     </p>
                 </div>
 
                 <div className="space-y-6">
                     <section className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-xl p-4 sm:p-6">
-                        <h2 className="font-bold text-lg text-blue-400 mb-3">⚡ Online Multiplayer</h2>
+                        <h2 className="font-bold text-lg text-blue-400 mb-3">⚡ Anonymous Duel Energy</h2>
                         <p className="text-gray-300 text-sm mb-3">
-                            Combat Pong features real-time 1v1 multiplayer:
+                            Combat Pong now creates a convincing 1v1 feeling locally:
                         </p>
                         <ul className="text-gray-300 text-sm space-y-2">
-                            <li>• <strong>Instant matchmaking</strong> - Find opponent in seconds</li>
-                            <li>• <strong>Real-time gameplay</strong> - No turn-based, live action</li>
-                            <li>• <strong>Cross-platform</strong> - Desktop vs mobile works</li>
-                            <li>• <strong>First to 90%</strong> - Winner conquers the board</li>
+                            <li>• <strong>No queue</strong> - Tap play and a rival appears instantly</li>
+                            <li>• <strong>Human-style pressure</strong> - The top paddle feints and surges</li>
+                            <li>• <strong>Cross-platform</strong> - Desktop and mobile both feel sharp</li>
+                            <li>• <strong>Territory swings</strong> - Boards flip fast when streaks spike</li>
                         </ul>
                     </section>
 
                     <section className="bg-white/5 rounded-xl p-4 sm:p-6">
                         <h2 className="font-bold text-lg mb-3">🎮 How 2-Player Works</h2>
                         <ol className="text-gray-300 text-sm space-y-2 list-decimal list-inside">
-                            <li>Login with Google account</li>
-                            <li>Click "Find Match" button</li>
-                            <li>Get paired with another player</li>
-                            <li>Each player controls their own ball</li>
-                            <li>First to 90% territory wins!</li>
+                            <li>Choose a difficulty that matches how brutal you want the duel to feel</li>
+                            <li>The game generates a rival alias, title, and signal readout</li>
+                            <li>The simulated rival responds like a real opponent under pressure</li>
+                            <li>Out-control the board before the 90-second clock expires</li>
+                            <li>Run it back instantly if the finish gets ugly</li>
                         </ol>
                     </section>
 
                     <section className="bg-white/5 rounded-xl p-4 sm:p-6">
                         <h2 className="font-bold text-lg mb-3">🏠 Same Room Play</h2>
                         <p className="text-gray-300 text-sm mb-3">
-                            Want to play with someone next to you? Try these options:
+                            Want to bring a real person into the room anyway? Try these options:
                         </p>
                         <ul className="text-gray-400 text-xs space-y-1">
-                            <li>• Both login on separate devices, find match at same time</li>
-                            <li>• Take turns in single player - compete for best score</li>
+                            <li>• Take turns on the same device and compare board percentage</li>
+                            <li>• Put the device on a table and coach each other's rematches</li>
                             <li>• One plays, one coaches - teamwork!</li>
                         </ul>
                     </section>
@@ -186,7 +186,7 @@ export const TwoPlayerPage = ({ onBack, onPlay }: SEOPageProps) => {
 
                 <div className="mt-8 space-y-3">
                     <a href="/" className="btn-gradient w-full py-4 min-h-[56px] rounded-xl font-bold text-white touch-manipulation block text-center">
-                        Find a Match - 2 Player Online!
+                        Start a Duel Now
                     </a>
                     <button onClick={() => onPlay('MEDIUM')} className="w-full py-3 rounded-xl border border-white/20 text-gray-300 hover:bg-white/5">
                         Or Practice vs AI First
@@ -204,7 +204,7 @@ export const BestFreeGamesPage = ({ onBack, onPlay }: SEOPageProps) => {
     useEffect(() => {
         document.title = 'Best Free Browser Games 2025 - Combat Pong | No Download';
         const metaDesc = document.querySelector('meta[name="description"]');
-        if (metaDesc) metaDesc.setAttribute('content', 'Looking for the best free browser games in 2025? Combat Pong: instant play, no download, no ads, multiplayer. One of the top free online games!');
+        if (metaDesc) metaDesc.setAttribute('content', 'Looking for the best free browser games in 2025? Combat Pong delivers instant play, no download, no ads, and a killer anonymous duel loop.');
         return () => { document.title = 'Combat Pong - Free Online Territory Control Game'; };
     }, []);
 
@@ -239,7 +239,7 @@ export const BestFreeGamesPage = ({ onBack, onPlay }: SEOPageProps) => {
                                 { feature: 'No Ads', check: true, desc: 'Zero interruptions or pop-ups' },
                                 { feature: 'Instant Play', check: true, desc: 'No download, no install' },
                                 { feature: 'Works Everywhere', check: true, desc: 'Desktop, mobile, tablet' },
-                                { feature: 'Multiplayer', check: true, desc: 'Real-time 1v1 battles' },
+                                { feature: 'No Accounts', check: true, desc: 'Anonymous rival mode works instantly' },
                                 { feature: 'Regular Updates', check: true, desc: 'New features added' },
                             ].map((item, i) => (
                                 <div key={i} className="flex items-center gap-3 bg-black/20 rounded-lg px-3 py-2">
@@ -262,7 +262,7 @@ export const BestFreeGamesPage = ({ onBack, onPlay }: SEOPageProps) => {
                             <li>• <strong>90-Second Matches</strong> - Quick, satisfying sessions</li>
                             <li>• <strong>Streak System</strong> - Skill-based speed mechanics</li>
                             <li>• <strong>Territory Control</strong> - Unique conquest gameplay</li>
-                            <li>• <strong>Online Multiplayer</strong> - Challenge real players</li>
+                            <li>• <strong>Anonymous Duel Mode</strong> - 1v1 pressure with zero login friction</li>
                         </ul>
                     </section>
 

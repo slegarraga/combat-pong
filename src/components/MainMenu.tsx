@@ -1,31 +1,25 @@
 /**
- * Main menu / home screen — the first thing players see.
+ * Main lobby for the rebuilt anonymous duel experience.
  *
- * Displays:
- *   - Game title and tagline
- *   - Player stats (wins, win rate, best score) if any games have been played
- *   - 4 difficulty buttons that launch single-player games
- *   - Multiplayer "Find Match" button (requires Google login)
- *   - Links to informational pages (How to Play, Tips, FAQ)
- *   - Login/logout controls and credits footer
+ * The old menu mixed single-player with account-gated multiplayer controls.
+ * This version makes the core promise obvious: hit play, get an anonymous rival
+ * instantly, and chase one-more-match momentum.
  */
 
-import { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
-import { getLocalStats, getWinRate, type PlayerStats } from '../game/PlayerStats';
+import { useEffect, useState } from 'react';
+import { DIFFICULTY } from '../game/constants';
+import { getAverageTerritory, getLocalStats, getWinRate, type PlayerStats } from '../game/PlayerStats';
+import type { Difficulty } from '../game/types';
 
 interface MainMenuProps {
-    onStartGame: (difficulty: 'EASY' | 'MEDIUM' | 'HARD' | 'NIGHTMARE') => void;
-    onLoginClick: () => void;
-    session: any;
-    onFindMatch?: () => void;
-    matchmakingStatus?: 'idle' | 'searching' | 'matched';
+    onStartGame: (difficulty: Difficulty) => void;
 }
 
-export const MainMenu = ({ onStartGame, onLoginClick, session, onFindMatch, matchmakingStatus }: MainMenuProps) => {
+const difficultyOrder: Difficulty[] = ['EASY', 'MEDIUM', 'HARD', 'NIGHTMARE'];
+
+export const MainMenu = ({ onStartGame }: MainMenuProps) => {
     const [stats, setStats] = useState<PlayerStats | null>(null);
 
-    // Load stats on mount
     useEffect(() => {
         const localStats = getLocalStats();
         if (localStats.gamesPlayed > 0) {
@@ -34,143 +28,139 @@ export const MainMenu = ({ onStartGame, onLoginClick, session, onFindMatch, matc
     }, []);
 
     return (
-        <div
-            className="flex flex-col items-center justify-center min-h-screen min-h-[100dvh] px-4 py-8 sm:py-12 md:py-16 text-white relative overflow-hidden"
-            style={{ background: '#1a1a2e' }}
-        >
-            {/* Title */}
-            <h1 className="text-4xl sm:text-5xl md:text-7xl font-black mb-2 sm:mb-4 tracking-tighter relative z-10 drop-shadow-2xl text-center text-white">
-                COMBAT PONG
-            </h1>
-            <p className="text-base sm:text-xl text-gray-400 mb-2 relative z-10">
-                Conquer the territory!
-            </p>
-            <p className="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-8 relative z-10">
-                ⏱️ 90 seconds • Most territory wins
-            </p>
-
-            {/* Stats Display - if player has games */}
-            {stats && stats.gamesPlayed > 0 && (
-                <div className="relative z-10 mb-4 sm:mb-6 flex gap-4 sm:gap-6 text-center">
-                    <div className="bg-white/5 rounded-xl px-4 py-2 sm:px-6 sm:py-3">
-                        <div className="text-xl sm:text-2xl font-bold text-green-400">{stats.wins}</div>
-                        <div className="text-[10px] sm:text-xs text-gray-500">Wins</div>
+        <div className="relative min-h-screen min-h-[100dvh] overflow-hidden bg-[var(--cp-bg)] text-[var(--cp-text)]">
+            <div className="cp-home-bg fixed inset-0 pointer-events-none" />
+            <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-6 sm:px-6 sm:py-8">
+                <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
+                    <div className="cp-chip rounded-full px-4 py-2 text-[11px] uppercase tracking-[0.26em] text-[var(--cp-muted)]">
+                        Anonymous duel arcade
                     </div>
-                    <div className="bg-white/5 rounded-xl px-4 py-2 sm:px-6 sm:py-3">
-                        <div className="text-xl sm:text-2xl font-bold text-blue-400">{getWinRate(stats)}%</div>
-                        <div className="text-[10px] sm:text-xs text-gray-500">Win Rate</div>
+                    <nav className="flex flex-wrap items-center gap-3 text-sm text-[var(--cp-muted)]">
+                        <a href="/how-to-play" className="hover:text-white">How to play</a>
+                        <a href="/tips" className="hover:text-white">Tips</a>
+                        <a href="/faq" className="hover:text-white">FAQ</a>
+                        <a href="/multiplayer" className="hover:text-white">Duel guide</a>
+                    </nav>
+                </header>
+
+                <main className="grid flex-1 gap-6 lg:grid-cols-[1.2fr,0.95fr]">
+                    <section className="cp-panel relative overflow-hidden">
+                        <div className="absolute -left-20 top-10 h-56 w-56 rounded-full bg-[radial-gradient(circle,_rgba(255,111,60,0.28),_transparent_68%)] blur-2xl" />
+                        <div className="absolute right-0 top-0 h-72 w-72 rounded-full bg-[radial-gradient(circle,_rgba(79,220,255,0.22),_transparent_66%)] blur-3xl" />
+                        <div className="relative max-w-3xl">
+                            <p className="cp-kicker">Queue-free competitive feel</p>
+                            <h1 className="mt-3 text-5xl font-black tracking-[-0.06em] text-white sm:text-6xl lg:text-7xl">
+                                Combat Pong
+                            </h1>
+                            <p className="mt-5 max-w-2xl text-lg leading-relaxed text-[var(--cp-muted)] sm:text-xl">
+                                A fake 1v1 that feels live: no account, no wait, just an anonymous rival,
+                                a brutal board split, and 90 seconds of increasingly nasty returns.
+                            </p>
+
+                            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+                                <div className="cp-stat-card">
+                                    <span className="cp-stat-label">Instant rival</span>
+                                    <strong className="cp-stat-value text-lg">Generated locally</strong>
+                                </div>
+                                <div className="cp-stat-card">
+                                    <span className="cp-stat-label">Match length</span>
+                                    <strong className="cp-stat-value text-lg">90 seconds</strong>
+                                </div>
+                                <div className="cp-stat-card">
+                                    <span className="cp-stat-label">Input</span>
+                                    <strong className="cp-stat-value text-lg">Mouse + touch</strong>
+                                </div>
+                            </div>
+
+                            {stats && (
+                                <div className="mt-8 grid gap-3 sm:grid-cols-4">
+                                    <div className="cp-stat-card">
+                                        <span className="cp-stat-label">Wins</span>
+                                        <strong className="cp-stat-value">{stats.wins}</strong>
+                                    </div>
+                                    <div className="cp-stat-card">
+                                        <span className="cp-stat-label">Win rate</span>
+                                        <strong className="cp-stat-value">{getWinRate(stats)}%</strong>
+                                    </div>
+                                    <div className="cp-stat-card">
+                                        <span className="cp-stat-label">Avg. territory</span>
+                                        <strong className="cp-stat-value">{getAverageTerritory(stats)}%</strong>
+                                    </div>
+                                    <div className="cp-stat-card">
+                                        <span className="cp-stat-label">Best streak</span>
+                                        <strong className="cp-stat-value">{stats.bestStreak}x</strong>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </section>
+
+                    <section className="space-y-4">
+                        <div className="cp-panel">
+                            <p className="cp-kicker">Choose your pressure level</p>
+                            <div className="mt-4 space-y-3">
+                                {difficultyOrder.map((difficulty) => {
+                                    const settings = DIFFICULTY[difficulty];
+                                    return (
+                                        <button
+                                            key={difficulty}
+                                            onClick={() => onStartGame(difficulty)}
+                                            className="cp-mode-card group w-full text-left"
+                                        >
+                                            <div>
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <h2 className="text-xl font-black text-white">{settings.label}</h2>
+                                                    <span className="text-xs uppercase tracking-[0.2em] text-[var(--cp-dim)]">
+                                                        {difficulty}
+                                                    </span>
+                                                </div>
+                                                <p className="mt-2 text-sm leading-relaxed text-[var(--cp-muted)]">
+                                                    {settings.subtitle}
+                                                </p>
+                                            </div>
+                                            <div className="mt-4 flex flex-wrap gap-2 text-xs uppercase tracking-[0.16em] text-[var(--cp-dim)]">
+                                                <span>{settings.ballPairs * 2} balls</span>
+                                                <span>•</span>
+                                                <span>{Math.round(settings.speedMod * 100)}% pace</span>
+                                                <span>•</span>
+                                                <span>{Math.round(settings.aiPrecision * 100)}% rival precision</span>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="cp-panel">
+                            <p className="cp-kicker">What changed</p>
+                            <div className="mt-4 space-y-3 text-sm leading-relaxed text-[var(--cp-muted)]">
+                                <p>No accounts. No Supabase. No real multiplayer infrastructure to slow the product down.</p>
+                                <p>The rival is fully simulated, anonymous, and tuned to feel more human under pressure.</p>
+                                <p>The board, HUD, and endgame loop are rebuilt around momentum swings and replay value.</p>
+                            </div>
+                        </div>
+                    </section>
+                </main>
+
+                <footer className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-white/6 pt-5 text-xs text-[var(--cp-dim)]">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <a href="/about" className="hover:text-white">About</a>
+                        <a href="/two-player" className="hover:text-white">2-player feel</a>
+                        <a href="/best-free" className="hover:text-white">Why it hits</a>
                     </div>
-                    <div className="bg-white/5 rounded-xl px-4 py-2 sm:px-6 sm:py-3">
-                        <div className="text-xl sm:text-2xl font-bold text-purple-400">{stats.bestScore}%</div>
-                        <div className="text-[10px] sm:text-xs text-gray-500">Best</div>
-                    </div>
-                </div>
-            )}
-
-            {/* User Status */}
-            {session && (
-                <div className="absolute top-3 left-3 sm:top-6 sm:left-6 text-xs sm:text-sm text-gray-400 bg-white/5 px-2 sm:px-4 py-1 sm:py-2 rounded-full backdrop-blur max-w-[40vw] truncate">
-                    ✨ {session.user.email}
-                </div>
-            )}
-
-            {/* Single Player Section */}
-            <div className="relative z-10 mb-6 sm:mb-8 w-full max-w-xs sm:max-w-sm">
-                <div className="text-center text-gray-400 mb-3 sm:mb-4 text-xs sm:text-sm uppercase tracking-widest">
-                    Choose Difficulty
-                </div>
-                <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                    <button
-                        onClick={() => onStartGame('EASY')}
-                        className="btn-gradient py-4 sm:py-4 min-h-[60px] rounded-xl font-bold text-sm sm:text-base transition-all hover:scale-105 active:scale-95 touch-manipulation text-white"
-                    >
-                        👶 EASY
-                        <div className="text-[10px] sm:text-xs opacity-80 mt-1">2 Balls • Slow</div>
-                    </button>
-                    <button
-                        onClick={() => onStartGame('MEDIUM')}
-                        className="btn-gradient py-4 sm:py-4 min-h-[60px] rounded-xl font-bold text-sm sm:text-base transition-all hover:scale-105 active:scale-95 touch-manipulation text-white"
-                    >
-                        ⚔️ MEDIUM
-                        <div className="text-[10px] sm:text-xs opacity-80 mt-1">2 Balls • Normal</div>
-                    </button>
-                    <button
-                        onClick={() => onStartGame('HARD')}
-                        className="btn-gradient py-4 sm:py-4 min-h-[60px] rounded-xl font-bold text-sm sm:text-base transition-all hover:scale-105 active:scale-95 touch-manipulation text-white"
-                    >
-                        🔥 HARD
-                        <div className="text-[10px] sm:text-xs opacity-80 mt-1">4 Balls • Fast</div>
-                    </button>
-                    <button
-                        onClick={() => onStartGame('NIGHTMARE')}
-                        className="btn-gradient py-4 sm:py-4 min-h-[60px] rounded-xl font-bold text-sm sm:text-base transition-all hover:scale-105 active:scale-95 touch-manipulation text-white"
-                    >
-                        💀 NIGHTMARE
-                        <div className="text-[10px] sm:text-xs opacity-80 mt-1">6 Balls • Chaos</div>
-                    </button>
-                </div>
-            </div>
-
-            {/* Multiplayer Section */}
-            <div className="relative z-10 mt-4 sm:mt-8 w-full max-w-xs sm:max-w-sm">
-                <div className="text-center text-gray-400 mb-3 sm:mb-4 text-xs sm:text-sm uppercase tracking-widest">
-                    Multiplayer
-                </div>
-                {session ? (
-                    <button
-                        onClick={onFindMatch}
-                        disabled={matchmakingStatus === 'searching'}
-                        className="btn-gradient w-full py-4 min-h-[56px] rounded-xl font-bold text-sm sm:text-base transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100 touch-manipulation text-white"
-                    >
-                        {matchmakingStatus === 'searching' ? '🔍 Finding...' : '⚡ FIND MATCH'}
-                    </button>
-                ) : (
-                    <button
-                        onClick={onLoginClick}
-                        className="w-full py-4 min-h-[56px] bg-white/5 hover:bg-white/10 active:bg-white/15 rounded-xl font-bold text-sm sm:text-base transition-all border border-white/10 touch-manipulation"
-                    >
-                        🔐 Login to Play VS
-                    </button>
-                )}
-            </div>
-
-            {/* SEO Internal Links */}
-            <div className="relative z-10 mt-6 sm:mt-10 flex flex-wrap justify-center gap-3 text-gray-500 text-xs sm:text-sm">
-                <a href="/how-to-play" className="hover:text-white transition-colors">📖 How to Play</a>
-                <span>•</span>
-                <a href="/tips" className="hover:text-white transition-colors">💡 Tips</a>
-                <span>•</span>
-                <a href="/faq" className="hover:text-white transition-colors">❓ FAQ</a>
-            </div>
-
-            {/* Auth buttons */}
-            {session ? (
-                <button
-                    onClick={() => supabase.auth.signOut()}
-                    className="absolute top-3 right-3 sm:top-6 sm:right-6 text-gray-400 hover:text-white text-xs sm:text-sm bg-white/5 hover:bg-white/10 px-3 sm:px-4 py-2 min-h-[44px] rounded-full backdrop-blur transition-all touch-manipulation"
-                >
-                    Sign Out
-                </button>
-            ) : (
-                <button
-                    onClick={onLoginClick}
-                    className="absolute top-3 right-3 sm:top-6 sm:right-6 text-gray-300 hover:text-white text-xs sm:text-sm bg-white/5 hover:bg-white/10 px-3 sm:px-4 py-2 min-h-[44px] rounded-full backdrop-blur transition-all touch-manipulation"
-                >
-                    Login
-                </button>
-            )}
-
-            {/* Footer with SEO links */}
-            <div className="absolute bottom-3 sm:bottom-6 text-gray-500 text-[10px] sm:text-xs text-center px-4">
-                <a href="/about" className="hover:text-white transition-colors mr-2">About</a>
-                •
-                <span className="mx-2">Inspired by{' '}
-                    <a href="https://github.com/vnglst/pong-wars" className="underline hover:text-white transition-colors" target="_blank" rel="noopener noreferrer">
-                        Pong Wars
-                    </a>
-                </span>
-                •
-                <span className="ml-2">© 2025 Combat Pong</span>
+                    <p>
+                        Inspired by{' '}
+                        <a
+                            href="https://github.com/vnglst/pong-wars"
+                            className="underline hover:text-white"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            Pong Wars
+                        </a>
+                        {' '}and rebuilt for sharper anonymous duels.
+                    </p>
+                </footer>
             </div>
         </div>
     );
