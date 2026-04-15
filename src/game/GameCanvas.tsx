@@ -199,10 +199,10 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
     const quickActionCopy = criticalActive
         ? 'One clean touch flips it.'
         : clutchActive
-            ? 'Angles matter now.'
+            ? 'Cut shots matter now.'
             : isCoarsePointer
-                ? 'Drag low. Cut wide.'
-                : 'Clip the edge for sharper exits.';
+                ? 'Drag low. Carve lanes.'
+                : 'Clip the edge to carve lanes.';
 
     useEffect(() => {
         const handleHotkeys = (event: KeyboardEvent) => {

@@ -9,6 +9,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+    BALL_CUT_CHARGE_MAX,
+    BALL_CUT_LANE_MAX_BONUS_CAPTURES,
+    BALL_CUT_LANE_RANGE,
+    BALL_CUT_LANE_WIDTH,
     BALL_RADIUS,
     BASE_ACCELERATION,
     CANVAS_SIZE,
@@ -25,6 +29,7 @@ import {
     PADDLE_EDGE_IMPACT_BONUS,
     PADDLE_EDGE_SPEED_BONUS,
     PADDLE_EDGE_SPIN_BONUS,
+    PADDLE_EDGE_CUT_CHARGE,
     PADDLE_EDGE_WINDOW_RANGE,
     PADDLE_EDGE_WINDOW_START,
     PADDLE_HEIGHT,
@@ -248,6 +253,7 @@ export const useGameLoop = (
             team,
             speedMultiplier: 1,
             captureCharge: 0,
+            cutCharge: 0,
             trail: [],
         };
     }, [difficultyConfig.speedMod]);
@@ -504,13 +510,21 @@ export const useGameLoop = (
                 );
             }
 
+            if (edgePower > 0.54) {
+                ball.cutCharge = clamp(
+                    ball.cutCharge + edgePower * PADDLE_EDGE_CUT_CHARGE + impactPower * 0.14,
+                    0,
+                    BALL_CUT_CHARGE_MAX,
+                );
+            }
+
             if (edgePower > 0.72) {
                 if (edgePower > 0.92 && impactPower > 0.48) {
                     ball.captureCharge = clamp(ball.captureCharge + 1, 0, MAX_CAPTURE_CHARGE);
                 }
 
                 emitFloatingText(
-                    'Edge cut',
+                    edgePower > 0.94 ? 'Cut shot' : 'Wide cut',
                     ball.x,
                     ball.y - (impactPower > 0.82 ? 48 : 32),
                     COLORS.dayAccent,
@@ -520,6 +534,7 @@ export const useGameLoop = (
         } else {
             ball.speedMultiplier = clamp(ball.speedMultiplier * (1 + state.rival.aggression * 0.03), 1, 2.2);
             ball.captureCharge = clamp(Math.round(state.rival.aggression * 1.6) - 1, 0, 2);
+            ball.cutCharge = clamp(edgePower * 0.34 + impactPower * 0.08, 0, 0.5);
         }
 
         const edgeSpeedBonus = edgePower * (PADDLE_EDGE_SPEED_BONUS + impactPower * PADDLE_EDGE_IMPACT_BONUS);
@@ -613,9 +628,16 @@ export const useGameLoop = (
         const enemyTeam: Team = ball.team === 'day' ? 'night' : 'day';
         const centerCol = clamp(Math.floor(ball.x / TILE_SIZE), 0, GRID_WIDTH - 1);
         const centerRow = clamp(Math.floor(ball.y / TILE_SIZE), 0, GRID_HEIGHT - 1);
-        const searchRadius = 1 + Math.min(ball.captureCharge, 2);
-        const maxDistance = TILE_SIZE * (1.2 + ball.captureCharge * 0.72);
-        const candidates: Array<{ col: number; row: number; index: number; distance: number }> = [];
+        const searchRadius = 1 + Math.min(ball.captureCharge, 2) + (ball.cutCharge >= 0.6 ? 1 : 0);
+        const maxDistance = TILE_SIZE * (1.2 + ball.captureCharge * 0.72) + ball.cutCharge * TILE_SIZE * 0.72;
+        const candidates: Array<{
+            col: number;
+            row: number;
+            index: number;
+            distance: number;
+            tileCenterX: number;
+            tileCenterY: number;
+        }> = [];
 
         for (let row = centerRow - searchRadius; row <= centerRow + searchRadius; row += 1) {
             if (row < 0 || row >= GRID_HEIGHT) continue;
@@ -630,7 +652,7 @@ export const useGameLoop = (
                 const distance = Math.hypot(ball.x - tileCenterX, ball.y - tileCenterY);
 
                 if (distance <= maxDistance) {
-                    candidates.push({ col, row, index, distance });
+                    candidates.push({ col, row, index, distance, tileCenterX, tileCenterY });
                 }
             }
         }
@@ -642,35 +664,77 @@ export const useGameLoop = (
         candidates.sort((left, right) => left.distance - right.distance);
         const captureCount = Math.min(candidates.length, 1 + ball.captureCharge);
         const primary = candidates[0];
+        const captureTargets = candidates.slice(0, captureCount);
         const effectColor = ball.team === 'day' ? COLORS.dayAccent : COLORS.nightAccent;
+        const travelSpeed = Math.hypot(ball.vx, ball.vy) || 1;
+        const directionX = ball.vx / travelSpeed;
+        const directionY = ball.vy / travelSpeed;
+        const laneTargets =
+            ball.cutCharge > 0.16
+                ? candidates
+                    .filter((candidate) => !captureTargets.some((target) => target.index === candidate.index))
+                    .map((candidate) => {
+                        const laneX = candidate.tileCenterX - primary.tileCenterX;
+                        const laneY = candidate.tileCenterY - primary.tileCenterY;
+                        const forward = laneX * directionX + laneY * directionY;
+                        const lateral = Math.abs(laneX * directionY - laneY * directionX);
+                        const laneScore = forward - lateral * 0.72 - candidate.distance * 0.1;
 
-        for (let index = 0; index < captureCount; index += 1) {
-            const target = candidates[index];
+                        return {
+                            ...candidate,
+                            forward,
+                            lateral,
+                            laneScore,
+                        };
+                    })
+                    .filter((candidate) =>
+                        candidate.forward > TILE_SIZE * 0.34
+                        && candidate.forward <= BALL_CUT_LANE_RANGE * (0.82 + ball.cutCharge * 0.58)
+                        && candidate.lateral <= BALL_CUT_LANE_WIDTH * (0.9 + ball.cutCharge * 0.4),
+                    )
+                    .sort((left, right) => right.laneScore - left.laneScore || left.distance - right.distance)
+                    .slice(0, Math.min(BALL_CUT_LANE_MAX_BONUS_CAPTURES, Math.max(1, Math.round(ball.cutCharge))))
+                : [];
+
+        captureTargets.push(...laneTargets);
+
+        for (let index = 0; index < captureTargets.length; index += 1) {
+            const target = captureTargets[index];
             ownership[target.index] = ball.team;
 
-            const tileCenterX = target.col * TILE_SIZE + TILE_SIZE / 2;
-            const tileCenterY = target.row * TILE_SIZE + TILE_SIZE / 2;
             emitParticles(
-                tileCenterX,
-                tileCenterY,
+                target.tileCenterX,
+                target.tileCenterY,
                 effectColor,
-                index === 0 ? 5 + Math.round(ball.speedMultiplier * 2) : 3 + ball.captureCharge,
+                index === 0
+                    ? 5 + Math.round(ball.speedMultiplier * 2) + Math.round(ball.cutCharge * 2)
+                    : 3 + ball.captureCharge + (index > captureCount - 1 ? 2 : 0),
             );
-            emitRing(tileCenterX, tileCenterY, effectColor, index === 0 ? 3.2 : 2.4);
+            emitRing(
+                target.tileCenterX,
+                target.tileCenterY,
+                effectColor,
+                index === 0 ? 3.2 + ball.cutCharge * 0.25 : 2.4 + (index > captureCount - 1 ? 0.35 : 0),
+            );
         }
 
-        if (captureCount > 1) {
-            triggerShake(3 + captureCount * 0.85);
-            emitFloatingText(`${captureCount}-tile break`, ball.x, ball.y - 14, effectColor, 15 + captureCount);
+        if (captureTargets.length > 1) {
+            triggerShake(3 + captureTargets.length * 0.85 + ball.cutCharge * 1.1);
+            emitFloatingText(
+                laneTargets.length > 0 ? 'Lane break' : `${captureTargets.length}-tile break`,
+                ball.x,
+                ball.y - 14,
+                effectColor,
+                15 + captureTargets.length + laneTargets.length,
+            );
         }
 
-        playTileBreakSound(captureCount, ball.team);
+        playTileBreakSound(captureTargets.length, ball.team);
         ball.captureCharge = Math.max(0, ball.captureCharge - 1);
+        ball.cutCharge = Math.max(0, ball.cutCharge - 0.82);
 
-        const primaryTileCenterX = primary.col * TILE_SIZE + TILE_SIZE / 2;
-        const primaryTileCenterY = primary.row * TILE_SIZE + TILE_SIZE / 2;
-        const dx = ball.x - primaryTileCenterX;
-        const dy = ball.y - primaryTileCenterY;
+        const dx = ball.x - primary.tileCenterX;
+        const dy = ball.y - primary.tileCenterY;
 
         if (Math.abs(dx) > Math.abs(dy)) {
             ball.vx *= -1;
@@ -682,6 +746,7 @@ export const useGameLoop = (
     const handleBoundaryMiss = (state: GameState, ball: Ball, owner: 'player' | 'rival') => {
         ball.speedMultiplier = 1;
         ball.captureCharge = 0;
+        ball.cutCharge = 0;
         ball.vx *= 0.86;
         ball.vy *= 0.86;
 
@@ -897,6 +962,10 @@ export const useGameLoop = (
         for (const ball of state.balls) {
             const ballColor = ball.team === 'day' ? COLORS.dayBall : COLORS.nightBall;
             const chargeGlow = ball.captureCharge * 10;
+            const speed = Math.hypot(ball.vx, ball.vy) || 1;
+            const slashTailLength = BALL_RADIUS * (4.6 + ball.cutCharge * 4.4 + Math.min(speed, 16) * 0.22);
+            const slashTailX = ball.x - (ball.vx / speed) * slashTailLength;
+            const slashTailY = ball.y - (ball.vy / speed) * slashTailLength;
             ctx.shadowBlur = 24 + chargeGlow;
             ctx.shadowColor = ballColor;
 
@@ -914,6 +983,24 @@ export const useGameLoop = (
                 ctx.beginPath();
                 ctx.arc(ball.x, ball.y, BALL_RADIUS * (1.55 + ball.captureCharge * 0.12), 0, Math.PI * 2);
                 ctx.fill();
+            }
+
+            if (ball.cutCharge > 0.14) {
+                ctx.globalAlpha = 0.1 + ball.cutCharge * 0.11;
+                ctx.strokeStyle = ballColor;
+                ctx.lineCap = 'round';
+                ctx.lineWidth = BALL_RADIUS * (1.15 + ball.cutCharge * 0.6);
+                ctx.beginPath();
+                ctx.moveTo(ball.x, ball.y);
+                ctx.lineTo(slashTailX, slashTailY);
+                ctx.stroke();
+
+                ctx.globalAlpha = 0.06 + ball.cutCharge * 0.06;
+                ctx.lineWidth = BALL_RADIUS * (2.1 + ball.cutCharge * 0.9);
+                ctx.beginPath();
+                ctx.moveTo(ball.x, ball.y);
+                ctx.lineTo(slashTailX, slashTailY);
+                ctx.stroke();
             }
 
             ctx.globalAlpha = 1;

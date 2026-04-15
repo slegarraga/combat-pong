@@ -39,6 +39,13 @@ export interface Ball {
      * rhythm, each impact can rip through more territory than a normal touch.
      */
     captureCharge: number;
+    /**
+     * Short-lived directional bonus earned from strong edge returns.
+     *
+     * While active, the next invasion prefers to carve a short lane in the
+     * ball's travel direction, making high-skill cuts feel visibly different.
+     */
+    cutCharge: number;
     trail: TrailPoint[];
 }
 

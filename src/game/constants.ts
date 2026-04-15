@@ -35,6 +35,11 @@ export const PADDLE_EDGE_WINDOW_RANGE = 0.4;
 export const PADDLE_EDGE_SPIN_BONUS = 3.2;
 export const PADDLE_EDGE_SPEED_BONUS = 0.82;
 export const PADDLE_EDGE_IMPACT_BONUS = 0.24;
+export const PADDLE_EDGE_CUT_CHARGE = 0.92;
+export const BALL_CUT_CHARGE_MAX = 1.6;
+export const BALL_CUT_LANE_RANGE = TILE_SIZE * 2.35;
+export const BALL_CUT_LANE_WIDTH = TILE_SIZE * 0.92;
+export const BALL_CUT_LANE_MAX_BONUS_CAPTURES = 2;
 
 /**
  * Core feel tuning.
