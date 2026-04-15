@@ -186,12 +186,15 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
         copied: 'Copied card',
         downloaded: 'Saved card',
     }[shareStatus];
+    const liveFeed = feed[0];
+    const liveFeedText = liveFeed?.text ?? rival.signature;
+    const liveFeedToneClass = liveFeed ? toneClassName[liveFeed.tone] : toneClassName.neutral;
     const pointerHint = isCoarsePointer
         ? 'Drag to steer the lower paddle'
         : isPointerLocked
             ? 'Aim locked • press Esc to release'
             : 'Click once to lock aim';
-    const quickActionCopy = isCoarsePointer ? 'Touch ready.' : 'Aim fast. Rematch faster.';
+    const quickActionCopy = isCoarsePointer ? 'Drag low. Hit clean.' : 'Swipe faster for heavier hits.';
 
     useEffect(() => {
         const handleHotkeys = (event: KeyboardEvent) => {
@@ -216,9 +219,9 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
     return (
         <div className="min-h-screen min-h-[100dvh] overflow-hidden bg-[var(--cp-bg)] text-[var(--cp-text)]">
             <div className="cp-arena-noise fixed inset-0 pointer-events-none" />
-            <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-4 sm:px-6 sm:py-6">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
+            <div className="relative mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 py-4 sm:px-6 sm:py-6">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
                         {onBack && (
                             <button
                                 onClick={onBack}
@@ -245,87 +248,48 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                     </div>
                 </div>
 
-                <div className="grid gap-4 lg:grid-cols-[1.05fr,minmax(0,640px),1.05fr]">
-                    <aside className="space-y-4">
-                        <section className="cp-panel">
-                            <div className="mb-4 flex items-center justify-between">
-                                <div>
-                                    <p className="cp-kicker">Your side</p>
-                                    <h2 className="cp-display text-2xl font-black text-[var(--cp-text)]">Own the lower half</h2>
-                                </div>
-                                <div
-                                    className="rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-[0.22em]"
-                                    style={{ borderColor: 'rgba(255, 111, 60, 0.25)', color: COLORS.dayAccent }}
-                                >
-                                    {difficultyMeta.label}
-                                </div>
-                            </div>
-                            <p className="text-sm leading-relaxed text-[var(--cp-muted)]">
-                                {difficultyMeta.subtitle}
-                            </p>
-                            <div className="mt-4 grid grid-cols-2 gap-3">
-                                <div className="cp-stat-card">
-                                    <span className="cp-stat-label">Current streak</span>
-                                    <strong className="cp-stat-value" style={{ color: COLORS.dayAccent }}>{streak}x</strong>
-                                </div>
-                                <div className="cp-stat-card">
-                                    <span className="cp-stat-label">Board surge</span>
-                                    <strong className="cp-stat-value">{surgeLevel > 0 ? `+${surgeLevel}` : 'Idle'}</strong>
-                                </div>
-                                <div className="cp-stat-card">
-                                    <span className="cp-stat-label">Tiles held</span>
-                                    <strong className="cp-stat-value">{score.day}</strong>
-                                </div>
-                                <div className="cp-stat-card">
-                                    <span className="cp-stat-label">Best this match</span>
-                                    <strong className="cp-stat-value">{bestStreak}x</strong>
-                                </div>
-                            </div>
-                        </section>
-
-                        <section className="cp-panel">
-                            <p className="cp-kicker">How it swings</p>
-                            <ul className="space-y-3 text-sm leading-relaxed text-[var(--cp-muted)]">
-                                <li>Drive the lower paddle with your mouse or thumb.</li>
-                                <li>Clean returns charge the ball so the next invasion flips more tiles.</li>
-                                <li>Finish above 50% territory when the horn lands.</li>
-                            </ul>
-                        </section>
-
-                        {stats && (
-                            <section className="cp-panel">
-                                <p className="cp-kicker">Career stats</p>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="cp-stat-card">
-                                        <span className="cp-stat-label">Win rate</span>
-                                        <strong className="cp-stat-value">{getWinRate(stats)}%</strong>
-                                    </div>
-                                    <div className="cp-stat-card">
-                                        <span className="cp-stat-label">Best board</span>
-                                        <strong className="cp-stat-value">{stats.bestScore}%</strong>
-                                    </div>
-                                    <div className="cp-stat-card">
-                                        <span className="cp-stat-label">Best streak</span>
-                                        <strong className="cp-stat-value">{stats.bestStreak}x</strong>
-                                    </div>
-                                    <div className="cp-stat-card">
-                                        <span className="cp-stat-label">Last rival</span>
-                                        <strong className="cp-stat-value text-base">{stats.lastRivalAlias}</strong>
-                                    </div>
-                                </div>
-                            </section>
-                        )}
-                    </aside>
-
-                    <main className="space-y-4">
-                        <section className="cp-panel">
-                            <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                                <div>
-                                    <p className="cp-kicker">Live duel</p>
-                                    <h1 className="cp-display text-3xl font-black tracking-tight sm:text-4xl">
-                                        Combat Pong
+                <main className="flex flex-1 items-center justify-center py-3 sm:py-6">
+                    <section className="w-full space-y-4">
+                        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                            <div className="max-w-2xl">
+                                <p className="cp-kicker">Matched rival</p>
+                                <div className="mt-2 flex flex-wrap items-center gap-3">
+                                    <h1 className="cp-display text-3xl font-black tracking-tight text-white sm:text-4xl">
+                                        {rival.alias}
                                     </h1>
+                                    <span
+                                        className="rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em]"
+                                        style={{ borderColor: 'rgba(255, 111, 60, 0.25)', color: COLORS.dayAccent }}
+                                    >
+                                        {difficultyMeta.label}
+                                    </span>
+                                    <span className="cp-chip rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-[var(--cp-muted)]">
+                                        {rival.title}
+                                    </span>
                                 </div>
+                                <p className="mt-3 max-w-xl text-sm leading-relaxed text-[var(--cp-muted)]">
+                                    {liveFeedText}
+                                </p>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2">
+                                <div className="cp-chip rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-[var(--cp-muted)]">
+                                    {pingMs}ms
+                                </div>
+                                <div className="cp-chip rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-[var(--cp-muted)]">
+                                    Streak {streak}x
+                                </div>
+                                <div className="cp-chip rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-[var(--cp-muted)]">
+                                    Surge {surgeLevel > 0 ? `+${surgeLevel}` : 'idle'}
+                                </div>
+                                <div className="cp-chip rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-[var(--cp-muted)]">
+                                    Pulse {momentum}%
+                                </div>
+                            </div>
+                        </div>
+
+                        <section className="cp-panel p-3 sm:p-4">
+                            <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                                 <div className="min-w-[220px]">
                                     <div className="mb-2 flex items-center justify-between font-mono text-sm">
                                         <span style={{ color: COLORS.nightBall }}>{nightPercent}% rival</span>
@@ -338,6 +302,10 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                                             <div style={{ width: `${dayPercent}%`, background: `linear-gradient(90deg, ${COLORS.dayAccent}, ${COLORS.day})` }} />
                                         </div>
                                     </div>
+                                </div>
+
+                                <div className={`rounded-full border px-4 py-2 text-sm ${liveFeedToneClass}`}>
+                                    {phase} · {quickActionCopy}
                                 </div>
                             </div>
 
@@ -406,6 +374,12 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                                                 </div>
                                             </div>
 
+                                            {stats && (
+                                                <p className="mt-4 text-xs uppercase tracking-[0.18em] text-[var(--cp-dim)]">
+                                                    Career win rate {getWinRate(stats)}% · Best board {stats.bestScore}%
+                                                </p>
+                                            )}
+
                                             <div className="mt-5 space-y-3">
                                                 <button
                                                     onClick={handleRestart}
@@ -430,86 +404,25 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                             </div>
                         </section>
 
-                        <div className="flex flex-wrap gap-3">
-                            <button
-                                onClick={togglePause}
-                                disabled={gameOver}
-                                className="cp-button-secondary disabled:opacity-50"
-                            >
-                                {isPaused ? 'Resume duel' : 'Pause duel'}
-                            </button>
-                            <button onClick={handleRestart} className="cp-button-secondary">
-                                Reset board
-                            </button>
-                            <div className="cp-chip rounded-full px-4 py-3 text-sm text-[var(--cp-muted)]">
-                                {quickActionCopy}
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className={`rounded-full border px-4 py-3 text-sm ${liveFeedToneClass}`}>
+                                {liveFeedText}
+                            </div>
+                            <div className="flex flex-wrap gap-3">
+                                <button
+                                    onClick={togglePause}
+                                    disabled={gameOver}
+                                    className="cp-button-secondary disabled:opacity-50"
+                                >
+                                    {isPaused ? 'Resume duel' : 'Pause duel'}
+                                </button>
+                                <button onClick={handleRestart} className="cp-button-secondary">
+                                    Reset board
+                                </button>
                             </div>
                         </div>
-                    </main>
-
-                    <aside className="space-y-4">
-                        <section className="cp-panel">
-                            <div className="mb-4 flex items-start justify-between gap-4">
-                                <div>
-                                    <p className="cp-kicker">Matched rival</p>
-                                    <h2 className="cp-display text-2xl font-black">{rival.alias}</h2>
-                                    <p className="mt-1 text-sm text-[var(--cp-muted)]">{rival.title}</p>
-                                </div>
-                                <div className="cp-chip rounded-full px-3 py-2 font-mono text-sm">
-                                    {pingMs}ms
-                                </div>
-                            </div>
-                            <p className="text-sm leading-relaxed text-[var(--cp-muted)]">
-                                {rival.signature}
-                            </p>
-                            <div className="mt-5">
-                                <div className="mb-2 flex items-center justify-between text-xs uppercase tracking-[0.2em] text-[var(--cp-dim)]">
-                                    <span>Match pulse</span>
-                                    <span>{momentum}%</span>
-                                </div>
-                                <div className="h-3 overflow-hidden rounded-full bg-black/40">
-                                    <div
-                                        className="h-full rounded-full transition-all duration-300"
-                                        style={{
-                                            width: `${momentum}%`,
-                                            background: `linear-gradient(90deg, ${COLORS.nightAccent}, ${COLORS.dayAccent})`,
-                                        }}
-                                    />
-                                </div>
-                            </div>
-                        </section>
-
-                        <section className="cp-panel">
-                            <div className="mb-4 flex items-center justify-between">
-                                <p className="cp-kicker">Arena feed</p>
-                                <span className="text-xs uppercase tracking-[0.18em] text-[var(--cp-dim)]">
-                                    {phase}
-                                </span>
-                            </div>
-                            <div className="space-y-3">
-                                {feed.map((item) => (
-                                    <div key={item.id} className={`rounded-2xl border px-4 py-3 text-sm ${toneClassName[item.tone]}`}>
-                                        {item.text}
-                                    </div>
-                                ))}
-                            </div>
-                        </section>
-
-                        <section className="cp-panel">
-                            <p className="cp-kicker">Board split</p>
-                            <div className="mt-3 grid grid-cols-2 gap-3">
-                                <div className="cp-stat-card">
-                                    <span className="cp-stat-label">Rival side</span>
-                                    <strong className="cp-stat-value" style={{ color: COLORS.nightBall }}>{score.night}</strong>
-                                </div>
-                                <div className="cp-stat-card">
-                                    <span className="cp-stat-label">Your side</span>
-                                    <strong className="cp-stat-value" style={{ color: COLORS.dayAccent }}>{score.day}</strong>
-                                </div>
-                            </div>
-                        </section>
-                    </aside>
-                </div>
+                    </section>
+                </main>
             </div>
         </div>
     );

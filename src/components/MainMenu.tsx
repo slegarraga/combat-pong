@@ -42,19 +42,19 @@ export const MainMenu = ({ onStartGame }: MainMenuProps) => {
                     </nav>
                 </header>
 
-                <main className="flex flex-1 items-center">
-                    <section className="mx-auto grid w-full max-w-6xl items-center gap-10 lg:grid-cols-[1.05fr,0.85fr]">
+                <main className="flex flex-1 items-center py-8 sm:py-10">
+                    <section className="mx-auto grid w-full max-w-6xl items-center gap-12 lg:grid-cols-[1.06fr,0.82fr]">
                         <div className="max-w-3xl">
-                            <p className="cp-kicker">Combat Pong</p>
-                            <h1 className="cp-display mt-4 text-6xl font-extrabold tracking-[-0.09em] text-white sm:text-7xl lg:text-[6.6rem]">
-                                Own the board in 90 seconds.
+                            <p className="cp-kicker">Anonymous territory duel</p>
+                            <h1 className="cp-display cp-home-title mt-4 text-white">
+                                Fast hands. Heavy hits. One more run.
                             </h1>
-                            <p className="mt-6 max-w-xl text-lg leading-relaxed text-[var(--cp-muted)] sm:text-xl">
-                                Combat Pong is a frictionless territory duel where clean returns charge the ball, rip through
-                                more tiles, and make every rematch feel deserved.
+                            <p className="cp-home-lede mt-6 max-w-2xl text-[var(--cp-muted)]">
+                                Every fast return hits harder, steals more ground, and turns the board in your favor.
+                                That one rule makes the duel instantly readable and extremely replayable.
                             </p>
 
-                            <div className="mt-8 flex flex-wrap items-center gap-3">
+                            <div className="mt-9 flex flex-wrap items-center gap-3">
                                 <button
                                     onClick={() => onStartGame('MEDIUM')}
                                     className="btn-gradient rounded-2xl px-7 py-4 text-base font-bold text-white"
@@ -69,9 +69,9 @@ export const MainMenu = ({ onStartGame }: MainMenuProps) => {
                                 </button>
                             </div>
 
-                            <div className="cp-home-meta mt-6 justify-start">
+                            <div className="cp-home-meta mt-7 justify-start">
                                 <span>No setup</span>
-                                <span>Instant read</span>
+                                <span>Heavier fast hits</span>
                                 <span>90-second rounds</span>
                                 <span>Instant rematches</span>
                                 <span>Mouse or touch</span>
@@ -96,9 +96,9 @@ export const MainMenu = ({ onStartGame }: MainMenuProps) => {
                                                 className="cp-mode-card group w-full text-left"
                                             >
                                                 <div className="flex items-center justify-between gap-3">
-                                                    <h2 className="cp-display text-xl font-bold text-white">{settings.label}</h2>
+                                                    <h2 className="cp-display text-[1.1rem] font-bold text-white sm:text-[1.2rem]">{settings.label}</h2>
                                                     <span className={`text-[10px] uppercase tracking-[0.18em] ${isDefault ? 'text-white' : 'text-[var(--cp-dim)]'}`}>
-                                                        {isDefault ? 'Best first run' : difficulty}
+                                                        {isDefault ? 'Start here' : difficulty}
                                                     </span>
                                                 </div>
                                                 <p className="mt-2 text-sm leading-relaxed text-[var(--cp-muted)]">
@@ -115,62 +115,56 @@ export const MainMenu = ({ onStartGame }: MainMenuProps) => {
                             </div>
 
                             {stats && (
-                                <div className="mt-8">
-                                    <div className="mb-4 flex items-center justify-between gap-3">
-                                        <p className="cp-kicker">Your run</p>
-                                        <span className="text-xs uppercase tracking-[0.18em] text-[var(--cp-dim)]">
-                                            {stats.gamesPlayed} matches
-                                        </span>
+                                <div className="cp-home-results mt-10">
+                                    <div className="cp-home-result">
+                                        <span>Wins</span>
+                                        <strong>{stats.wins}</strong>
                                     </div>
-                                    <div className="grid gap-3 sm:grid-cols-4">
-                                        <div className="cp-stat-card">
-                                            <span className="cp-stat-label">Wins</span>
-                                            <strong className="cp-stat-value">{stats.wins}</strong>
-                                        </div>
-                                        <div className="cp-stat-card">
-                                            <span className="cp-stat-label">Win rate</span>
-                                            <strong className="cp-stat-value">{getWinRate(stats)}%</strong>
-                                        </div>
-                                        <div className="cp-stat-card">
-                                            <span className="cp-stat-label">Avg. territory</span>
-                                            <strong className="cp-stat-value">{getAverageTerritory(stats)}%</strong>
-                                        </div>
-                                        <div className="cp-stat-card">
-                                            <span className="cp-stat-label">Best streak</span>
-                                            <strong className="cp-stat-value">{stats.bestStreak}x</strong>
-                                        </div>
+                                    <div className="cp-home-result">
+                                        <span>Win rate</span>
+                                        <strong>{getWinRate(stats)}%</strong>
+                                    </div>
+                                    <div className="cp-home-result">
+                                        <span>Avg. territory</span>
+                                        <strong>{getAverageTerritory(stats)}%</strong>
+                                    </div>
+                                    <div className="cp-home-result">
+                                        <span>Best streak</span>
+                                        <strong>{stats.bestStreak}x</strong>
                                     </div>
                                 </div>
                             )}
                         </div>
 
                         <div className="lg:justify-self-end">
-                            <div className="cp-home-stage p-5 sm:p-6">
+                            <div className="cp-home-stage p-6 sm:p-7">
                                 <div className="relative">
                                     <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.2em] text-[var(--cp-muted)]">
-                                        <span>Board preview</span>
-                                        <span>No waiting</span>
+                                        <span>Live board</span>
+                                        <span>90-second duel</span>
                                     </div>
-                                    <div className="cp-home-board mt-4">
+                                    <div className="cp-home-board mt-5">
+                                        <div className="cp-home-preview-paddle cp-home-preview-paddle-top" />
+                                        <div className="cp-home-preview-paddle cp-home-preview-paddle-bottom" />
                                         <div className="cp-home-orb cp-home-orb-night" />
                                         <div className="cp-home-orb cp-home-orb-day" />
-                                        <div className="cp-home-board-chip cp-home-board-chip-top">Pressure rises</div>
-                                        <div className="cp-home-board-chip cp-home-board-chip-bottom">Territory flips fast</div>
+                                        <div className="cp-home-board-chip cp-home-board-chip-top">Speed scales impact</div>
+                                        <div className="cp-home-board-chip cp-home-board-chip-bottom">Clean streaks steal faster</div>
                                     </div>
                                 </div>
 
                                 <div className="cp-home-stage-copy mt-6">
-                                    <p className="cp-display text-3xl font-bold tracking-[-0.06em] text-white sm:text-[2.35rem]">
-                                        Fast to read. Hard to drop.
+                                    <p className="cp-display text-3xl font-bold tracking-[-0.06em] text-white sm:text-[2.6rem]">
+                                        The faster the swing, the harder the board breaks.
                                     </p>
                                     <p className="mt-3 max-w-md text-sm leading-relaxed text-[var(--cp-muted)]">
-                                        Every clean return overcharges the next invasion, every streak sharpens the pace,
-                                        and every finish is built to trigger another run.
+                                        You understand the rule in seconds, then spend the next matches trying to hit
+                                        cleaner, faster, and meaner than the last one.
                                     </p>
                                 </div>
 
                                 <div className="cp-home-stage-tags mt-5">
-                                    <span>90s rounds</span>
+                                    <span>Dynamic impact</span>
                                     <span>Charged streaks</span>
                                     <span>Rematch loop</span>
                                 </div>

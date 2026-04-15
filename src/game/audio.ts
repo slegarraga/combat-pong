@@ -138,32 +138,53 @@ export const playPaddleImpactSound = ({
     owner,
     streak,
     charge,
+    impactPower,
+    speed,
 }: {
     owner: 'player' | 'rival';
     streak: number;
     charge: number;
+    impactPower: number;
+    speed: number;
 }) => {
     withAudio((context) => {
         const baseFrequency = owner === 'player'
-            ? 280 + Math.min(streak, 10) * 18 + charge * 28
-            : 210 + charge * 12;
+            ? 280 + Math.min(streak, 10) * 18 + charge * 28 + impactPower * 32
+            : 210 + charge * 12 + impactPower * 18;
+        const gain = owner === 'player'
+            ? 0.026 + impactPower * 0.02 + Math.min(speed / 28, 0.012)
+            : 0.014 + impactPower * 0.009;
+        const duration = owner === 'player'
+            ? 0.05 + impactPower * 0.028
+            : 0.048 + impactPower * 0.014;
 
         playVoice(context, {
             frequency: baseFrequency,
-            endFrequency: owner === 'player' ? baseFrequency * 1.45 : baseFrequency * 1.18,
-            duration: owner === 'player' ? 0.055 : 0.05,
-            gain: owner === 'player' ? 0.035 : 0.018,
+            endFrequency: owner === 'player' ? baseFrequency * (1.34 + impactPower * 0.16) : baseFrequency * (1.15 + impactPower * 0.08),
+            duration,
+            gain,
             type: owner === 'player' ? 'triangle' : 'sine',
         });
 
         if (owner === 'player' && charge > 0) {
             playVoice(context, {
                 frequency: baseFrequency * 0.5,
-                endFrequency: baseFrequency * 0.72,
-                duration: 0.08,
-                gain: 0.018 + charge * 0.003,
+                endFrequency: baseFrequency * (0.72 + impactPower * 0.08),
+                duration: 0.08 + impactPower * 0.015,
+                gain: 0.014 + charge * 0.003 + impactPower * 0.005,
                 type: 'sine',
                 delay: 0.008,
+            });
+        }
+
+        if (owner === 'player' && impactPower > 0.72) {
+            playVoice(context, {
+                frequency: baseFrequency * 2.1,
+                endFrequency: baseFrequency * 1.45,
+                duration: 0.03 + impactPower * 0.012,
+                gain: 0.01 + impactPower * 0.008,
+                type: 'square',
+                delay: 0.004,
             });
         }
     });
