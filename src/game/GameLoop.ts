@@ -41,6 +41,10 @@ import {
     PADDLE_TARGET_RESPONSE,
     PADDLE_WIDTH,
     PLAYER_RETURN_BOOST,
+    PLAYER_DESTRUCTION_MAX_BONUS,
+    PLAYER_DESTRUCTION_RANGE_STEP,
+    PLAYER_DESTRUCTION_SPEED_STEP,
+    PLAYER_DESTRUCTION_SPEED_THRESHOLD,
     PLAYER_SPIN_FACTOR,
     RIVAL_RETURN_BOOST,
     RIVAL_SPIN_FACTOR,
@@ -657,17 +661,37 @@ export const useGameLoop = (
      * only make the rally faster, they also make each successful invasion feel
      * dramatically more valuable.
      *
-     * Very fast player balls get an additional capture bonus so hot streaks
-     * visibly chew wider holes through enemy territory.
+     * Very fast player balls widen their search area, flip more tiles, and keep
+     * more of their charge so hot streaks visibly chew wider holes through the
+     * enemy side instead of feeling like a subtle stat bonus.
      */
     const detectTileCollision = (ball: Ball, ownership: Team[]) => {
         const enemyTeam: Team = ball.team === 'day' ? 'night' : 'day';
         const streakOverdrive = ball.team === 'day' ? getStreakOverdrive(streakRef.current) : 0;
         const overdriveCaptureBonus = Math.floor(streakOverdrive / STREAK_OVERDRIVE_CAPTURE_STEP);
+        const travelSpeed = Math.hypot(ball.vx, ball.vy) || 1;
+        const speedDamageBonus = ball.team === 'day'
+            ? Math.floor(
+                clamp(
+                    (travelSpeed - PLAYER_DESTRUCTION_SPEED_THRESHOLD * difficultyConfig.speedMod) / PLAYER_DESTRUCTION_SPEED_STEP,
+                    0,
+                    PLAYER_DESTRUCTION_MAX_BONUS,
+                ),
+            )
+            : 0;
+        const streakDamageBonus = ball.team === 'day'
+            ? Math.min(4, Math.floor((streakOverdrive + Math.max(0, streakRef.current - 2)) / 2))
+            : 0;
+        const destructionBonus = speedDamageBonus + streakDamageBonus;
         const centerCol = clamp(Math.floor(ball.x / TILE_SIZE), 0, GRID_WIDTH - 1);
         const centerRow = clamp(Math.floor(ball.y / TILE_SIZE), 0, GRID_HEIGHT - 1);
-        const searchRadius = 1 + Math.min(ball.captureCharge, 2) + (ball.cutCharge >= 0.6 ? 1 : 0);
-        const maxDistance = TILE_SIZE * (1.2 + ball.captureCharge * 0.72) + ball.cutCharge * TILE_SIZE * 0.72;
+        const searchRadius = 1
+            + Math.min(ball.captureCharge, 2)
+            + (ball.cutCharge >= 0.6 ? 1 : 0)
+            + Math.min(2, Math.floor(destructionBonus / 2));
+        const maxDistance = TILE_SIZE * (1.2 + ball.captureCharge * 0.72)
+            + ball.cutCharge * TILE_SIZE * 0.72
+            + destructionBonus * PLAYER_DESTRUCTION_RANGE_STEP;
         const candidates: Array<{
             col: number;
             row: number;
@@ -700,13 +724,9 @@ export const useGameLoop = (
         }
 
         candidates.sort((left, right) => left.distance - right.distance);
-        const travelSpeed = Math.hypot(ball.vx, ball.vy) || 1;
-        const speedCaptureBonus = ball.team === 'day'
-            ? Math.floor(clamp((travelSpeed - OPENING_LAUNCH_SPEED * difficultyConfig.speedMod) / 2.4, 0, 3))
-            : 0;
         const captureCount = Math.min(
             candidates.length,
-            1 + ball.captureCharge + overdriveCaptureBonus + speedCaptureBonus,
+            1 + ball.captureCharge + overdriveCaptureBonus + speedDamageBonus + Math.ceil(streakDamageBonus * 0.7),
         );
         const primary = candidates[0];
         const captureTargets = candidates.slice(0, captureCount);
@@ -740,8 +760,11 @@ export const useGameLoop = (
                     .slice(
                         0,
                         Math.min(
-                            BALL_CUT_LANE_MAX_BONUS_CAPTURES + overdriveCaptureBonus + Math.min(speedCaptureBonus, 1),
-                            Math.max(1, Math.round(ball.cutCharge + overdriveCaptureBonus + speedCaptureBonus * 0.5)),
+                            BALL_CUT_LANE_MAX_BONUS_CAPTURES + overdriveCaptureBonus + Math.min(speedDamageBonus, 2) + Math.min(2, Math.floor(streakDamageBonus / 2)),
+                            Math.max(
+                                1,
+                                Math.round(ball.cutCharge + overdriveCaptureBonus + speedDamageBonus * 0.75 + streakDamageBonus * 0.45),
+                            ),
                         ),
                     )
                 : [];
@@ -769,11 +792,11 @@ export const useGameLoop = (
         }
 
         if (captureTargets.length > 1) {
-            triggerShake(3 + captureTargets.length * 0.9 + ball.cutCharge * 1.1 + speedCaptureBonus * 0.75);
+            triggerShake(3 + captureTargets.length * 0.95 + ball.cutCharge * 1.1 + destructionBonus * 0.9);
             emitFloatingText(
                 laneTargets.length > 0
                     ? streakOverdrive > 0 ? 'Overdrive break' : 'Lane break'
-                    : speedCaptureBonus > 1 ? 'Shock break' : `${captureTargets.length}-tile break`,
+                    : destructionBonus > 4 ? 'Shock break' : `${captureTargets.length}-tile break`,
                 ball.x,
                 ball.y - 14,
                 effectColor,
@@ -782,8 +805,10 @@ export const useGameLoop = (
         }
 
         playTileBreakSound(captureTargets.length, ball.team);
-        ball.captureCharge = Math.max(0, ball.captureCharge - 1);
-        ball.cutCharge = Math.max(0, ball.cutCharge - 0.82);
+        const captureDrain = destructionBonus >= 5 ? 0 : destructionBonus >= 2 ? 0.5 : 1;
+        const cutDrain = Math.max(0.36, 0.82 - destructionBonus * 0.08);
+        ball.captureCharge = Math.max(0, ball.captureCharge - captureDrain);
+        ball.cutCharge = Math.max(0, ball.cutCharge - cutDrain);
 
         const dx = ball.x - primary.tileCenterX;
         const dy = ball.y - primary.tileCenterY;

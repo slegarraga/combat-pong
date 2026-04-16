@@ -61,6 +61,16 @@ export const STREAK_OVERDRIVE_SPEED_STEP = 0.2;
 export const STREAK_OVERDRIVE_IMPACT_STEP = 0.26;
 export const STREAK_OVERDRIVE_CAPTURE_STEP = 2;
 export const MAX_CAPTURE_CHARGE = 7;
+/**
+ * Destruction tuning.
+ *
+ * Once the player accelerates the ball and keeps a clean streak alive, tile
+ * invasions should become obviously more violent, not just numerically better.
+ */
+export const PLAYER_DESTRUCTION_SPEED_THRESHOLD = 7.4;
+export const PLAYER_DESTRUCTION_SPEED_STEP = 1.35;
+export const PLAYER_DESTRUCTION_MAX_BONUS = 6;
+export const PLAYER_DESTRUCTION_RANGE_STEP = TILE_SIZE * 0.52;
 export const BALL_RADIUS = TILE_SIZE / 2;
 export const TRAIL_LENGTH = 7;
 
