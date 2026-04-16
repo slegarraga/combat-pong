@@ -59,6 +59,15 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
     const easierDifficulty = difficultyOrder[difficultyIndex - 1];
     const suggestedDifficulty = playerWon ? harderDifficulty : easierDifficulty;
     const suggestedDifficultyLabel = suggestedDifficulty ? DIFFICULTY[suggestedDifficulty].label : null;
+    const primaryActionLabel = playerWon ? 'Keep the arena' : 'Take it back';
+    const secondaryActionLabel = suggestedDifficulty && suggestedDifficultyLabel
+        ? playerWon
+            ? `Push harder · ${suggestedDifficultyLabel}`
+            : `Settle in · ${suggestedDifficultyLabel}`
+        : 'Back to home';
+    const postMatchHint = suggestedDifficulty
+        ? 'Click anywhere to rematch. Shift+Enter changes the heat.'
+        : 'Click anywhere to rematch.';
 
     const formatTime = (seconds: number) => {
         const minutes = Math.floor(seconds / 60);
@@ -155,6 +164,15 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
 
         onChangeDifficulty(nextDifficulty);
     }, [difficulty, onChangeDifficulty, restart]);
+
+    const handlePostMatchSecondary = useCallback(() => {
+        if (suggestedDifficulty) {
+            handleDifficultyJump(suggestedDifficulty);
+            return;
+        }
+
+        onBack?.();
+    }, [handleDifficultyJump, onBack, suggestedDifficulty]);
 
     const handleSoundToggle = useCallback(() => {
         const nextValue = !soundEnabled;
@@ -276,7 +294,18 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
                                 )}
 
                                 {gameOver && (
-                                    <div className="absolute inset-0 z-20 flex items-center justify-center rounded-[22px] bg-black/78 px-5 py-6 backdrop-blur-md">
+                                    <div
+                                        className="absolute inset-0 z-20 flex cursor-pointer items-center justify-center rounded-[22px] bg-black/72 px-5 py-6 backdrop-blur-md"
+                                        onClick={handleRestart}
+                                        onKeyDown={(event) => {
+                                            if (event.key === 'Enter' || event.key === ' ') {
+                                                event.preventDefault();
+                                                handleRestart();
+                                            }
+                                        }}
+                                        role="button"
+                                        tabIndex={0}
+                                    >
                                         <div className="w-full max-w-[18.5rem] text-center">
                                             <p className="cp-kicker">Match complete</p>
                                             <h2
@@ -297,22 +326,27 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
 
                                             <div className="mt-5 space-y-2">
                                                 <button
-                                                    onClick={handleRestart}
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        handleRestart();
+                                                    }}
                                                     className="btn-gradient w-full justify-center rounded-2xl px-5 py-3.5 text-base font-bold text-white"
                                                 >
-                                                    Instant rematch
+                                                    {primaryActionLabel}
                                                 </button>
                                                 <button
-                                                    onClick={suggestedDifficulty ? () => handleDifficultyJump(suggestedDifficulty) : onBack}
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        handlePostMatchSecondary();
+                                                    }}
                                                     className="cp-button-secondary w-full justify-center px-4 py-3 text-sm"
                                                 >
-                                                    {suggestedDifficulty && suggestedDifficultyLabel
-                                                        ? playerWon
-                                                            ? `Raise heat · ${suggestedDifficultyLabel}`
-                                                            : `Reset lower · ${suggestedDifficultyLabel}`
-                                                        : 'Back to home'}
+                                                    {secondaryActionLabel}
                                                 </button>
                                             </div>
+                                            <p className="mt-4 text-[10px] uppercase tracking-[0.16em] text-[var(--cp-dim)]">
+                                                {postMatchHint}
+                                            </p>
                                         </div>
                                     </div>
                                 )}
