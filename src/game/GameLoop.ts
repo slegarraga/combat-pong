@@ -14,6 +14,7 @@ import {
     BALL_CUT_LANE_RANGE,
     BALL_CUT_LANE_WIDTH,
     BALL_RADIUS,
+    BALL_SPEED_TRAIL_THRESHOLD,
     BASE_ACCELERATION,
     CANVAS_SIZE,
     CLUTCH_COMEBACK_DAMAGE_BONUS,
@@ -27,6 +28,9 @@ import {
     DIFFICULTY,
     GRID_HEIGHT,
     GRID_WIDTH,
+    IMPACT_HIT_STOP_MAX,
+    IMPACT_HIT_STOP_RECOVERY,
+    IMPACT_HIT_STOP_THRESHOLD,
     MAX_CAPTURE_CHARGE,
     MATCH_DURATION,
     MAX_SPEED,
@@ -232,6 +236,7 @@ export const useGameLoop = (
     });
     const ballImpactRef = useRef<Record<string, BallImpactState>>({});
     const touchControlRef = useRef<TouchControlState | null>(null);
+    const hitStopRef = useRef(0);
     const shakeRef = useRef({ x: 0, y: 0, intensity: 0 });
     const gameOverRef = useRef(false);
     const startTimeRef = useRef(0);
@@ -326,6 +331,17 @@ export const useGameLoop = (
 
     const triggerShake = (intensity = 4) => {
         shakeRef.current.intensity = Math.max(shakeRef.current.intensity, intensity);
+    };
+
+    const triggerHitStop = (owner: 'player' | 'rival', impactPower: number) => {
+        if (owner !== 'player' || impactPower <= IMPACT_HIT_STOP_THRESHOLD) return;
+
+        const normalized = clamp(
+            (impactPower - IMPACT_HIT_STOP_THRESHOLD) / (1.72 - IMPACT_HIT_STOP_THRESHOLD),
+            0,
+            1,
+        );
+        hitStopRef.current = Math.max(hitStopRef.current, normalized * IMPACT_HIT_STOP_MAX);
     };
 
     const emitFloatingText = (text: string, x: number, y: number, color: string, size = 16) => {
@@ -424,9 +440,23 @@ export const useGameLoop = (
             angle,
         };
 
+        triggerHitStop(owner, intensity);
+
         emitImpactFlash(ball.x, ball.y, angle + Math.PI, color, BALL_RADIUS * (5.8 + intensity * 2.4), BALL_RADIUS * (0.5 + intensity * 0.18), intensity);
         emitImpactFlash(ball.x, ball.y, angle + Math.PI * 0.5, color, BALL_RADIUS * (2.8 + intensity * 1.1), BALL_RADIUS * 0.24, intensity * 0.74);
         emitImpactFlash(ball.x, ball.y, angle - Math.PI * 0.5, color, BALL_RADIUS * (2.8 + intensity * 1.1), BALL_RADIUS * 0.24, intensity * 0.74);
+
+        if (owner === 'player' && intensity > 1.02) {
+            emitImpactFlash(
+                ball.x,
+                ball.y,
+                angle + Math.PI,
+                '#ffffff',
+                BALL_RADIUS * (7.8 + intensity * 3.2),
+                BALL_RADIUS * (0.22 + intensity * 0.08),
+                intensity * 0.9,
+            );
+        }
     };
 
     const initOwnership = (): Team[] => {
@@ -1605,6 +1635,7 @@ export const useGameLoop = (
             const ballColor = ball.team === 'day' ? COLORS.dayBall : COLORS.nightBall;
             const chargeGlow = ball.captureCharge * 10;
             const speed = Math.hypot(ball.vx, ball.vy) || 1;
+            const speedWake = clamp((speed - BALL_SPEED_TRAIL_THRESHOLD) / 4.2, 0, 1);
             const slashTailLength = BALL_RADIUS * (4.6 + ball.cutCharge * 4.4 + Math.min(speed, 16) * 0.22);
             const slashTailX = ball.x - (ball.vx / speed) * slashTailLength;
             const slashTailY = ball.y - (ball.vy / speed) * slashTailLength;
@@ -1618,6 +1649,32 @@ export const useGameLoop = (
                 ctx.arc(point.x, point.y, BALL_RADIUS * (1 - index * 0.08), 0, Math.PI * 2);
                 ctx.fill();
             });
+
+            if (speedWake > 0.01) {
+                const wakeLength = BALL_RADIUS * (5.2 + speedWake * 9.4 + ball.captureCharge * 1.2);
+                const wakeTailX = ball.x - (ball.vx / speed) * wakeLength;
+                const wakeTailY = ball.y - (ball.vy / speed) * wakeLength;
+                const wakeGradient = ctx.createLinearGradient(ball.x, ball.y, wakeTailX, wakeTailY);
+                wakeGradient.addColorStop(0, hexToRgba(ballColor, 0.8));
+                wakeGradient.addColorStop(0.42, hexToRgba(ballColor, 0.28 + speedWake * 0.2));
+                wakeGradient.addColorStop(1, hexToRgba(ballColor, 0));
+
+                ctx.globalAlpha = 0.18 + speedWake * 0.28;
+                ctx.strokeStyle = wakeGradient;
+                ctx.lineCap = 'round';
+                ctx.lineWidth = BALL_RADIUS * (1 + speedWake * 0.9);
+                ctx.beginPath();
+                ctx.moveTo(ball.x, ball.y);
+                ctx.lineTo(wakeTailX, wakeTailY);
+                ctx.stroke();
+
+                ctx.globalAlpha = 0.08 + speedWake * 0.14;
+                ctx.lineWidth = BALL_RADIUS * (2 + speedWake * 1.4);
+                ctx.beginPath();
+                ctx.moveTo(ball.x, ball.y);
+                ctx.lineTo(wakeTailX, wakeTailY);
+                ctx.stroke();
+            }
 
             if (ball.captureCharge > 0) {
                 ctx.globalAlpha = 0.14 + ball.captureCharge * 0.04;
@@ -1703,8 +1760,13 @@ export const useGameLoop = (
         const state = stateRef.current;
         if (!state || !state.isRunning || gameOverRef.current) return;
 
-        const delta = clamp((currentTime - lastFrameRef.current) / 16.6667, 0.65, 1.45);
+        const frameDelta = clamp((currentTime - lastFrameRef.current) / 16.6667, 0.65, 1.45);
         lastFrameRef.current = currentTime;
+        const hitStop = hitStopRef.current;
+        if (hitStop > 0) {
+            hitStopRef.current = Math.max(0, hitStop - IMPACT_HIT_STOP_RECOVERY * frameDelta);
+        }
+        const delta = frameDelta * (1 - hitStop * 0.62);
 
         const elapsed = (currentTime - startTimeRef.current) / 1000;
         const remaining = Math.max(0, MATCH_DURATION - elapsed);
@@ -1784,6 +1846,7 @@ export const useGameLoop = (
         };
         ballImpactRef.current = {};
         touchControlRef.current = null;
+        hitStopRef.current = 0;
         shakeRef.current = { x: 0, y: 0, intensity: 0 };
         gameOverRef.current = false;
         lastNarrationRef.current = 0;

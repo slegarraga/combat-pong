@@ -206,6 +206,26 @@ export const playPaddleImpactSound = ({
                 q: 2.2,
             });
         }
+
+        if (owner === 'player' && (impactPower > 1.12 || speed > 15.2)) {
+            playVoice(context, {
+                frequency: baseFrequency * 0.24,
+                endFrequency: baseFrequency * 0.16,
+                duration: 0.085 + impactPower * 0.024,
+                gain: 0.01 + impactPower * 0.008 + Math.min(speed / 46, 0.007),
+                type: 'sawtooth',
+                delay: 0.002,
+            });
+            playVoice(context, {
+                frequency: baseFrequency * 4.2,
+                endFrequency: baseFrequency * 2.9,
+                duration: 0.018 + impactPower * 0.007,
+                gain: 0.007 + impactPower * 0.006,
+                type: 'square',
+                delay: 0.001,
+                q: 3,
+            });
+        }
     });
 };
 

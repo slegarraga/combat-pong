@@ -58,6 +58,16 @@ export const BALL_CUT_CHARGE_MAX = 1.6;
 export const BALL_CUT_LANE_RANGE = TILE_SIZE * 2.35;
 export const BALL_CUT_LANE_WIDTH = TILE_SIZE * 0.92;
 export const BALL_CUT_LANE_MAX_BONUS_CAPTURES = 2;
+/**
+ * Impact juice tuning.
+ *
+ * Strong player contacts now drag the simulation for a blink so the hit lands
+ * with more weight, and very fast balls get a brighter speed wake.
+ */
+export const IMPACT_HIT_STOP_THRESHOLD = 0.88;
+export const IMPACT_HIT_STOP_MAX = 0.58;
+export const IMPACT_HIT_STOP_RECOVERY = 0.28;
+export const BALL_SPEED_TRAIL_THRESHOLD = 10.8;
 
 /**
  * Core feel tuning.
