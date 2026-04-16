@@ -89,11 +89,44 @@ interface FloatingText {
     size: number;
 }
 
+interface BoardPulse {
+    x: number;
+    y: number;
+    radius: number;
+    life: number;
+    color: string;
+    intensity: number;
+}
+
+interface BoardSlash {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    width: number;
+    life: number;
+    color: string;
+    intensity: number;
+}
+
 const PLAYER_PADDLE_Y = CANVAS_SIZE - PADDLE_OFFSET - PADDLE_HEIGHT;
 const AI_PADDLE_Y = PADDLE_OFFSET;
 
 const clamp = (value: number, min: number, max: number) =>
     Math.min(max, Math.max(min, value));
+
+const hexToRgba = (hex: string, alpha: number) => {
+    const normalized = hex.replace('#', '');
+    const safeHex = normalized.length === 3
+        ? normalized.split('').map((char) => `${char}${char}`).join('')
+        : normalized;
+    const value = Number.parseInt(safeHex, 16);
+    const red = (value >> 16) & 255;
+    const green = (value >> 8) & 255;
+    const blue = value & 255;
+
+    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+};
 
 const getStreakOverdrive = (streak: number) =>
     Math.max(0, streak - STREAK_OVERDRIVE_START + 1);
@@ -136,6 +169,8 @@ export const useGameLoop = (
     const particlesRef = useRef<Particle[]>([]);
     const ringsRef = useRef<ImpactRing[]>([]);
     const floatingTextsRef = useRef<FloatingText[]>([]);
+    const boardPulsesRef = useRef<BoardPulse[]>([]);
+    const boardSlashesRef = useRef<BoardSlash[]>([]);
     const shakeRef = useRef({ x: 0, y: 0, intensity: 0 });
     const gameOverRef = useRef(false);
     const startTimeRef = useRef(0);
@@ -242,6 +277,38 @@ export const useGameLoop = (
         });
     };
 
+    const emitBoardPulse = (x: number, y: number, color: string, radius = TILE_SIZE * 1.2, intensity = 1) => {
+        boardPulsesRef.current.push({
+            x,
+            y,
+            radius,
+            life: 1,
+            color,
+            intensity,
+        });
+    };
+
+    const emitBoardSlash = (
+        x1: number,
+        y1: number,
+        x2: number,
+        y2: number,
+        color: string,
+        width = TILE_SIZE * 0.4,
+        intensity = 1,
+    ) => {
+        boardSlashesRef.current.push({
+            x1,
+            y1,
+            x2,
+            y2,
+            width,
+            life: 1,
+            color,
+            intensity,
+        });
+    };
+
     const initOwnership = (): Team[] => {
         const ownership: Team[] = [];
         for (let index = 0; index < GRID_WIDTH * GRID_HEIGHT; index += 1) {
@@ -322,6 +389,25 @@ export const useGameLoop = (
 
             if (text.life <= 0) {
                 floatingTextsRef.current.splice(index, 1);
+            }
+        }
+
+        for (let index = boardPulsesRef.current.length - 1; index >= 0; index -= 1) {
+            const pulse = boardPulsesRef.current[index];
+            pulse.radius += (1.9 + pulse.intensity * 1.4) * delta;
+            pulse.life -= (0.055 + pulse.intensity * 0.006) * delta;
+
+            if (pulse.life <= 0) {
+                boardPulsesRef.current.splice(index, 1);
+            }
+        }
+
+        for (let index = boardSlashesRef.current.length - 1; index >= 0; index -= 1) {
+            const slash = boardSlashesRef.current[index];
+            slash.life -= (0.06 + slash.intensity * 0.008) * delta;
+
+            if (slash.life <= 0) {
+                boardSlashesRef.current.splice(index, 1);
             }
         }
     };
@@ -770,10 +856,22 @@ export const useGameLoop = (
                 : [];
 
         captureTargets.push(...laneTargets);
+        const destructionIntensity = clamp(
+            (destructionBonus + ball.captureCharge + ball.cutCharge * 2 + laneTargets.length * 0.9) / 7.4,
+            0.55,
+            1.65,
+        );
 
         for (let index = 0; index < captureTargets.length; index += 1) {
             const target = captureTargets[index];
             ownership[target.index] = ball.team;
+            emitBoardPulse(
+                target.tileCenterX,
+                target.tileCenterY,
+                effectColor,
+                TILE_SIZE * (0.9 + destructionIntensity * 0.72 + (index >= captureCount ? 0.18 : 0)),
+                destructionIntensity + (index === 0 ? 0.16 : 0),
+            );
 
             emitParticles(
                 target.tileCenterX,
@@ -788,6 +886,19 @@ export const useGameLoop = (
                 target.tileCenterY,
                 effectColor,
                 index === 0 ? 3.2 + ball.cutCharge * 0.25 : 2.4 + (index > captureCount - 1 ? 0.35 : 0),
+            );
+        }
+
+        if ((laneTargets.length > 0 || destructionBonus > 2) && captureTargets.length > 1) {
+            const farthestTarget = captureTargets[captureTargets.length - 1];
+            emitBoardSlash(
+                primary.tileCenterX,
+                primary.tileCenterY,
+                farthestTarget.tileCenterX,
+                farthestTarget.tileCenterY,
+                effectColor,
+                TILE_SIZE * (0.28 + destructionIntensity * 0.18),
+                destructionIntensity,
             );
         }
 
@@ -968,6 +1079,49 @@ export const useGameLoop = (
                 ctx.fillRect(column * TILE_SIZE + 1, row * TILE_SIZE + 1, TILE_SIZE - 2, TILE_SIZE - 2);
             }
         }
+        ctx.globalAlpha = 1;
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        for (const pulse of boardPulsesRef.current) {
+            const pulseGradient = ctx.createRadialGradient(
+                pulse.x,
+                pulse.y,
+                0,
+                pulse.x,
+                pulse.y,
+                pulse.radius,
+            );
+            pulseGradient.addColorStop(0, hexToRgba('#ffffff', 0.12 * pulse.intensity * pulse.life));
+            pulseGradient.addColorStop(0.32, hexToRgba(pulse.color, 0.2 * pulse.intensity * pulse.life));
+            pulseGradient.addColorStop(0.72, hexToRgba(pulse.color, 0.08 * pulse.intensity * pulse.life));
+            pulseGradient.addColorStop(1, hexToRgba(pulse.color, 0));
+            ctx.globalAlpha = clamp(pulse.life * (0.7 + pulse.intensity * 0.24), 0, 1);
+            ctx.fillStyle = pulseGradient;
+            ctx.beginPath();
+            ctx.arc(pulse.x, pulse.y, pulse.radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.lineCap = 'round';
+        for (const slash of boardSlashesRef.current) {
+            ctx.globalAlpha = clamp(slash.life * (0.45 + slash.intensity * 0.16), 0, 1);
+            ctx.strokeStyle = slash.color;
+            ctx.lineWidth = slash.width * (1 + (1 - slash.life) * 0.34);
+            ctx.beginPath();
+            ctx.moveTo(slash.x1, slash.y1);
+            ctx.lineTo(slash.x2, slash.y2);
+            ctx.stroke();
+
+            ctx.globalAlpha = clamp(slash.life * (0.22 + slash.intensity * 0.08), 0, 1);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.lineWidth = slash.width * 0.35;
+            ctx.beginPath();
+            ctx.moveTo(slash.x1, slash.y1);
+            ctx.lineTo(slash.x2, slash.y2);
+            ctx.stroke();
+        }
+        ctx.restore();
         ctx.globalAlpha = 1;
 
         const pulseGradient = ctx.createRadialGradient(
@@ -1190,6 +1344,8 @@ export const useGameLoop = (
         particlesRef.current = [];
         ringsRef.current = [];
         floatingTextsRef.current = [];
+        boardPulsesRef.current = [];
+        boardSlashesRef.current = [];
         shakeRef.current = { x: 0, y: 0, intensity: 0 };
         gameOverRef.current = false;
         lastNarrationRef.current = 0;
