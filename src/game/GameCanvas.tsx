@@ -243,7 +243,7 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
                                         {exitLabel}
                                     </button>
                                 )}
-                                <p className="truncate text-[9px] uppercase tracking-[0.18em] text-[var(--cp-dim)] sm:text-[11px]">
+                                <p className="truncate text-[9px] uppercase tracking-[0.18em] text-[var(--cp-muted)] sm:text-[11px]">
                                     {arenaMetaLine}
                                 </p>
                             </div>
@@ -260,7 +260,7 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
                         >
                             <div className="mb-1.5">
                                 {!isCoarsePointer && (
-                                    <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-[var(--cp-dim)]">
+                                    <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-[var(--cp-muted)]">
                                         {difficultyMeta.label}
                                     </p>
                                 )}
@@ -298,18 +298,19 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
                                 />
 
                                 {isPaused && !gameOver && (
-                                    <div className="absolute inset-0 z-20 flex items-center justify-center rounded-[20px] bg-black/70 backdrop-blur sm:rounded-[22px]">
-                                        <div className="text-center">
-                                            <p className="cp-kicker">Paused</p>
+                                    <div className="absolute inset-0 z-20 flex items-center justify-center rounded-[20px] px-4 py-5 sm:rounded-[22px]">
+                                        <div className="cp-overlay-scrim absolute inset-0 rounded-[20px] sm:rounded-[22px]" />
+                                        <div className="cp-overlay-card relative max-w-[16.5rem] text-center">
+                                            <p className="cp-kicker cp-overlay-kicker">Paused</p>
                                             <h2 className="mt-2 text-3xl font-black">Hold the pressure</h2>
-                                            <p className="mt-2 text-sm text-[var(--cp-muted)]">Resume when you are ready to pick the duel back up.</p>
+                                            <p className="cp-overlay-copy mt-2 text-sm">Resume when you are ready to pick the duel back up.</p>
                                         </div>
                                     </div>
                                 )}
 
                                 {gameOver && (
                                     <div
-                                        className="absolute inset-0 z-20 flex cursor-pointer items-center justify-center rounded-[20px] bg-black/72 px-4 py-5 backdrop-blur-md sm:rounded-[22px] sm:px-5 sm:py-6"
+                                        className="absolute inset-0 z-20 flex cursor-pointer items-center justify-center rounded-[20px] px-4 py-5 sm:rounded-[22px] sm:px-5 sm:py-6"
                                         onClick={handleRestart}
                                         onKeyDown={(event) => {
                                             if (event.key === 'Enter' || event.key === ' ') {
@@ -320,21 +321,22 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
                                         role="button"
                                         tabIndex={0}
                                     >
-                                        <div className="w-full max-w-[17.25rem] text-center sm:max-w-[18.5rem]">
-                                            <p className="cp-kicker">Match complete</p>
+                                        <div className="cp-overlay-scrim absolute inset-0 rounded-[20px] sm:rounded-[22px]" />
+                                        <div className="cp-overlay-card relative w-full max-w-[17.25rem] text-center sm:max-w-[18.5rem]">
+                                            <p className="cp-kicker cp-overlay-kicker">Match complete</p>
                                             <h2
                                                 className="cp-display mt-2 text-[1.8rem] font-black sm:text-[2.25rem]"
                                                 style={{ color: playerWon ? COLORS.success : COLORS.nightBall }}
                                             >
                                                 {playerWon ? 'Arena secured' : 'Rival held firm'}
                                             </h2>
-                                            <p className="mt-3 text-[0.92rem] leading-relaxed text-[var(--cp-muted)]">
+                                            <p className="cp-overlay-copy mt-3 text-[0.92rem] leading-relaxed">
                                                 {playerWon
                                                     ? `Held ${dayPercent}% against ${rival.alias}. Stay in rhythm.`
                                                     : `${rival.alias} closed ${nightPercent}% to ${dayPercent}. Run it back now.`}
                                             </p>
 
-                                            <p className="mt-4 text-[11px] uppercase tracking-[0.16em] text-[var(--cp-dim)]">
+                                            <p className="cp-overlay-meta mt-4 text-[11px] uppercase tracking-[0.16em]">
                                                 {resultLine}
                                             </p>
 
@@ -358,7 +360,7 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
                                                     {secondaryActionLabel}
                                                 </button>
                                             </div>
-                                            <p className="mt-4 text-[10px] uppercase tracking-[0.16em] text-[var(--cp-dim)]">
+                                            <p className="cp-overlay-hint mt-4 text-[10px] uppercase tracking-[0.16em]">
                                                 {postMatchHint}
                                             </p>
                                         </div>

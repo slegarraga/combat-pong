@@ -11,8 +11,8 @@
   --cp-surface-strong: rgba(8, 13, 20, 0.92);
   --cp-border: rgba(255, 255, 255, 0.08);
   --cp-text: #edf4ff;
-  --cp-muted: #8fa6bd;
-  --cp-dim: #61748a;
+  --cp-muted: #a2bad1;
+  --cp-dim: #7b93aa;
   --cp-ember: #ff6f3c;
   --cp-sand: #ffbe7a;
   --cp-ice: #4fdcff;
@@ -199,7 +199,10 @@ select {
 
 .cp-chip {
   border: 1px solid var(--cp-border);
-  background: rgba(255, 255, 255, 0.04);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    rgba(7, 12, 19, 0.78);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(12px);
 }
 
@@ -505,9 +508,12 @@ select {
   align-items: center;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    rgba(7, 12, 19, 0.82);
   padding: 0.8rem 1.15rem;
   color: var(--cp-text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   transition:
     transform 0.16s ease,
     background 0.16s ease,
@@ -521,8 +527,45 @@ select {
 
 .cp-button-secondary:hover {
   transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
+    rgba(10, 18, 28, 0.9);
   border-color: rgba(255, 255, 255, 0.2);
+}
+
+.cp-overlay-scrim {
+  background:
+    radial-gradient(circle at 50% 36%, rgba(18, 30, 42, 0.28), transparent 34%),
+    linear-gradient(180deg, rgba(3, 7, 12, 0.78), rgba(3, 7, 12, 0.9));
+  backdrop-filter: blur(10px) saturate(0.82);
+}
+
+.cp-overlay-card {
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 36%),
+    linear-gradient(180deg, rgba(12, 20, 31, 0.88), rgba(7, 12, 19, 0.94));
+  box-shadow:
+    0 28px 60px rgba(0, 0, 0, 0.44),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  padding: 1.2rem 1.05rem;
+}
+
+.cp-overlay-kicker {
+  color: rgba(237, 244, 255, 0.74);
+}
+
+.cp-overlay-copy {
+  color: rgba(221, 234, 246, 0.94);
+}
+
+.cp-overlay-meta {
+  color: rgba(188, 207, 223, 0.86);
+}
+
+.cp-overlay-hint {
+  color: rgba(161, 186, 209, 0.84);
 }
 
 .cp-timer-pill {
@@ -647,6 +690,11 @@ select {
 
   .cp-home-stage-cta {
     padding: 0.62rem 0.9rem;
+  }
+
+  .cp-overlay-card {
+    border-radius: 1.35rem;
+    padding: 1.05rem 0.95rem;
   }
 }
 
