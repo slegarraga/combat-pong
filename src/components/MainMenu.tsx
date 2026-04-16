@@ -5,6 +5,7 @@
  * immediately, then get out of the way.
  */
 
+import { useEffect, useState } from 'react';
 import { DIFFICULTY } from '../game/constants';
 import type { Difficulty } from '../game/types';
 
@@ -15,6 +16,27 @@ interface MainMenuProps {
 const difficultyOrder: Difficulty[] = ['EASY', 'MEDIUM', 'HARD', 'NIGHTMARE'];
 
 export const MainMenu = ({ onStartGame }: MainMenuProps) => {
+    const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>('MEDIUM');
+    const selectedSettings = DIFFICULTY[selectedDifficulty];
+
+    useEffect(() => {
+        const handleKeydown = (event: KeyboardEvent) => {
+            if (event.defaultPrevented) return;
+            if (event.key !== 'Enter') return;
+
+            const target = event.target;
+            if (target instanceof HTMLElement && ['BUTTON', 'A', 'INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) {
+                return;
+            }
+
+            event.preventDefault();
+            onStartGame(selectedDifficulty);
+        };
+
+        window.addEventListener('keydown', handleKeydown);
+        return () => window.removeEventListener('keydown', handleKeydown);
+    }, [onStartGame, selectedDifficulty]);
+
     return (
         <div className="relative min-h-screen min-h-[100dvh] overflow-hidden bg-[var(--cp-bg)] text-[var(--cp-text)]">
             <div className="cp-home-bg fixed inset-0 pointer-events-none" />
@@ -26,78 +48,76 @@ export const MainMenu = ({ onStartGame }: MainMenuProps) => {
                     </a>
                 </header>
 
-                <main className="flex flex-1 items-center py-6 sm:py-8">
-                    <section className="grid w-full items-center gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.8fr)]">
-                        <div className="max-w-xl">
+                <main className="flex flex-1 items-center py-5 sm:py-7">
+                    <section className="grid w-full items-center gap-7 lg:grid-cols-[minmax(0,1fr)_minmax(18.5rem,0.82fr)]">
+                        <div className="max-w-[34rem]">
                             <p className="cp-home-mini">Anonymous territory duel</p>
                             <h1 className="cp-display cp-home-title mt-3 text-white">Take the board.</h1>
-                            <p className="cp-home-lede mt-4 max-w-lg text-[var(--cp-muted)]">
-                                Fast swings hit harder. Hot streaks rip wider lanes. Every round lasts 90 seconds and
-                                ends before the rematch urge can cool off.
+                            <p className="cp-home-lede mt-4 max-w-[30rem] text-[var(--cp-muted)]">
+                                Hit clean, build speed, rip lanes open. The whole duel resolves in 90 seconds.
                             </p>
 
                             <div className="mt-6 flex flex-wrap items-center gap-3">
                                 <button
-                                    onClick={() => onStartGame('MEDIUM')}
+                                    onClick={() => onStartGame(selectedDifficulty)}
                                     className="btn-gradient rounded-2xl px-6 py-3.5 text-base font-bold text-white"
                                 >
-                                    Play now
-                                </button>
-                                <button
-                                    onClick={() => onStartGame('EASY')}
-                                    className="cp-button-secondary rounded-2xl px-5 py-3.5 text-sm"
-                                >
-                                    Warm up
+                                    Drop in · {selectedSettings.label}
                                 </button>
                                 <a href="/how-to-play" className="cp-home-utility-link cp-home-inline-link">
                                     How it works
                                 </a>
                             </div>
 
-                            <p className="cp-home-note mt-4">No account. No queue. Mouse or touch.</p>
+                            <p className="cp-home-note mt-4">No account. No queue. Enter starts instantly.</p>
 
-                            <div className="mt-8">
-                                <div className="mb-3 flex items-center justify-between gap-3">
+                            <div className="mt-7 space-y-3">
+                                <div className="flex items-center justify-between gap-3">
                                     <p className="cp-kicker">Pick the heat</p>
                                     <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--cp-dim)]">
-                                        Medium starts best
+                                        {selectedDifficulty === 'MEDIUM' ? 'Best first run' : selectedSettings.label}
                                     </span>
                                 </div>
-                                <div className="cp-mode-grid">
+                                <div className="cp-home-difficulty-rail">
                                     {difficultyOrder.map((difficulty) => {
                                         const settings = DIFFICULTY[difficulty];
-                                        const isDefault = difficulty === 'MEDIUM';
+                                        const isSelected = difficulty === selectedDifficulty;
 
                                         return (
                                             <button
                                                 key={difficulty}
-                                                onClick={() => onStartGame(difficulty)}
-                                                className="cp-mode-card group w-full text-left"
+                                                type="button"
+                                                onClick={() => setSelectedDifficulty(difficulty)}
+                                                className={`cp-home-difficulty-pill ${isSelected ? 'cp-home-difficulty-pill-active' : ''}`}
                                             >
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <h2 className="cp-display text-[1.02rem] font-bold text-white sm:text-[1.08rem]">
-                                                        {settings.label}
-                                                    </h2>
-                                                    <span className={`text-[10px] uppercase tracking-[0.16em] ${isDefault ? 'text-white' : 'text-[var(--cp-dim)]'}`}>
-                                                        {isDefault ? 'Start here' : difficulty}
-                                                    </span>
-                                                </div>
-                                                <p className="mt-2 text-sm leading-relaxed text-[var(--cp-muted)]">
-                                                    {settings.subtitle}
-                                                </p>
-                                                <div className="mt-3 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] text-[var(--cp-dim)]">
-                                                    <span>{settings.ballPairs * 2} balls</span>
-                                                    <span>{Math.round(settings.speedMod * 100)}% pace</span>
-                                                </div>
+                                                <span className="cp-display text-[0.98rem] font-bold text-white">
+                                                    {settings.label}
+                                                </span>
+                                                <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--cp-dim)]">
+                                                    {settings.ballPairs * 2} balls
+                                                </span>
                                             </button>
                                         );
                                     })}
                                 </div>
+                                <p className="cp-home-stage-note max-w-[31rem]">
+                                    {selectedSettings.subtitle}. Clean streaks snowball harder, and late comebacks can still rip the board away.
+                                </p>
                             </div>
                         </div>
 
                         <div className="lg:justify-self-end">
-                            <div className="cp-home-stage p-4 sm:p-5">
+                            <button
+                                type="button"
+                                onClick={() => onStartGame(selectedDifficulty)}
+                                className="cp-home-stage-button group w-full text-left"
+                                aria-label={`Start ${selectedSettings.label} duel`}
+                            >
+                                <div className="cp-home-stage p-4 sm:p-5">
+                                    <div className="cp-home-stage-topline">
+                                        <span>{selectedSettings.label}</span>
+                                        <span>Click board to play</span>
+                                    </div>
                                 <div className="cp-home-board">
                                     <div className="cp-home-preview-paddle cp-home-preview-paddle-top" />
                                     <div className="cp-home-preview-paddle cp-home-preview-paddle-bottom" />
@@ -105,10 +125,12 @@ export const MainMenu = ({ onStartGame }: MainMenuProps) => {
                                     <div className="cp-home-orb cp-home-orb-night" />
                                     <div className="cp-home-orb cp-home-orb-day" />
                                 </div>
-                                <p className="cp-home-stage-note mt-4">
-                                    Keep a streak alive and each clean return tears through more of the other side.
-                                </p>
-                            </div>
+                                    <div className="cp-home-stage-footer mt-4">
+                                        <p className="cp-home-stage-hint">{selectedSettings.subtitle}</p>
+                                        <span className="cp-home-stage-cta">Drop in</span>
+                                    </div>
+                                </div>
+                            </button>
                         </div>
                     </section>
                 </main>
