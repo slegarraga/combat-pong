@@ -229,6 +229,38 @@ export const playPaddleImpactSound = ({
     });
 };
 
+export const playOverdrivePulseSound = (intensity: number) => {
+    withAudio((context) => {
+        const safeIntensity = Math.min(intensity, 8);
+        const base = 220 + safeIntensity * 20;
+
+        playVoice(context, {
+            frequency: base,
+            endFrequency: base * 1.42,
+            duration: 0.08 + safeIntensity * 0.005,
+            gain: 0.014 + safeIntensity * 0.0018,
+            type: 'triangle',
+        });
+        playVoice(context, {
+            frequency: base * 0.46,
+            endFrequency: base * 0.26,
+            duration: 0.11 + safeIntensity * 0.008,
+            gain: 0.01 + safeIntensity * 0.0015,
+            type: 'sawtooth',
+            delay: 0.01,
+        });
+        playVoice(context, {
+            frequency: base * 2.4,
+            endFrequency: base * 1.7,
+            duration: 0.024 + safeIntensity * 0.004,
+            gain: 0.008 + safeIntensity * 0.0012,
+            type: 'square',
+            delay: 0.006,
+            q: 2.4,
+        });
+    });
+};
+
 export const playClutchEnterSound = () => {
     withAudio((context) => {
         playVoice(context, {

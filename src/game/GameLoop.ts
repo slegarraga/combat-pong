@@ -78,7 +78,7 @@ import {
     TILE_SIZE,
     TRAIL_LENGTH,
 } from './constants';
-import { playClutchEnterSound, playClutchPulseSound, playFinishSound, playMissSound, playPaddleImpactSound, playTileBreakSound } from './audio';
+import { playClutchEnterSound, playClutchPulseSound, playFinishSound, playMissSound, playOverdrivePulseSound, playPaddleImpactSound, playTileBreakSound } from './audio';
 import { createRivalProfile, fluctuatePing, getRivalFeedLine } from './rivals';
 import type {
     Ball,
@@ -160,6 +160,11 @@ interface BallImpactState {
     angle: number;
 }
 
+interface BoardSurgeState {
+    life: number;
+    intensity: number;
+}
+
 interface TouchControlState {
     activeId: number;
     startClientX: number;
@@ -235,6 +240,7 @@ export const useGameLoop = (
         rival: { life: 0, intensity: 0, edgeBias: 0 },
     });
     const ballImpactRef = useRef<Record<string, BallImpactState>>({});
+    const boardSurgeRef = useRef<BoardSurgeState>({ life: 0, intensity: 0 });
     const touchControlRef = useRef<TouchControlState | null>(null);
     const hitStopRef = useRef(0);
     const shakeRef = useRef({ x: 0, y: 0, intensity: 0 });
@@ -331,6 +337,13 @@ export const useGameLoop = (
 
     const triggerShake = (intensity = 4) => {
         shakeRef.current.intensity = Math.max(shakeRef.current.intensity, intensity);
+    };
+
+    const triggerBoardSurge = (intensity = 1) => {
+        boardSurgeRef.current = {
+            life: 1,
+            intensity: Math.max(boardSurgeRef.current.intensity, intensity),
+        };
     };
 
     const triggerHitStop = (owner: 'player' | 'rival', impactPower: number) => {
@@ -606,6 +619,9 @@ export const useGameLoop = (
             };
         }
         ballImpactRef.current = nextBallStates;
+
+        boardSurgeRef.current.life = Math.max(0, boardSurgeRef.current.life - (0.052 + boardSurgeRef.current.intensity * 0.006) * delta);
+        boardSurgeRef.current.intensity *= Math.pow(0.95, delta);
     };
 
     const updateShake = () => {
@@ -765,8 +781,29 @@ export const useGameLoop = (
             emitFloatingText(`Charge +${ball.captureCharge}`, ball.x, ball.y - 18, COLORS.dayBall, 16 + ball.captureCharge);
         }
 
+        if (streakOverdrive > 0) {
+            triggerBoardSurge(clamp(0.42 + streakOverdrive * 0.12 + ball.captureCharge * 0.05, 0.42, 1.28));
+        }
+
         if ([STREAK_OVERDRIVE_START, STREAK_OVERDRIVE_START + 3, STREAK_OVERDRIVE_START + 6].includes(streakRef.current)) {
             emitFloatingText('Overdrive', ball.x, ball.y - 46, COLORS.dayAccent, 20 + streakOverdrive * 1.2);
+            emitBoardPulse(
+                CANVAS_SIZE / 2,
+                CANVAS_SIZE * 0.72,
+                COLORS.dayAccent,
+                CANVAS_SIZE * (0.14 + streakOverdrive * 0.014),
+                1 + streakOverdrive * 0.14,
+            );
+            emitBoardSlash(
+                CANVAS_SIZE / 2,
+                CANVAS_SIZE * 0.8,
+                ball.x,
+                ball.y,
+                COLORS.dayAccent,
+                TILE_SIZE * (0.46 + streakOverdrive * 0.04),
+                1 + streakOverdrive * 0.16,
+            );
+            playOverdrivePulseSound(streakOverdrive);
             narrate('High streaks now rip deeper through the board.', 'positive', 0);
         }
 
@@ -1377,6 +1414,30 @@ export const useGameLoop = (
         ctx.fillStyle = boardFill;
         ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
+        const streakOverdrive = getStreakOverdrive(streakRef.current);
+        const boardSurge = boardSurgeRef.current;
+        const surgeIntensity = clamp(boardSurge.life * boardSurge.intensity + streakOverdrive * 0.08, 0, 1.45);
+        if (surgeIntensity > 0.01) {
+            const floorGlow = ctx.createLinearGradient(0, CANVAS_SIZE, 0, CANVAS_SIZE * 0.08);
+            floorGlow.addColorStop(0, hexToRgba(COLORS.dayAccent, 0.28 + surgeIntensity * 0.12));
+            floorGlow.addColorStop(0.34, hexToRgba(COLORS.day, 0.12 + surgeIntensity * 0.08));
+            floorGlow.addColorStop(1, hexToRgba(COLORS.dayAccent, 0));
+            ctx.globalAlpha = clamp(0.24 + surgeIntensity * 0.14, 0, 0.5);
+            ctx.fillStyle = floorGlow;
+            ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+            const sweepProgress = (lastFrameRef.current / 460) % 1;
+            const sweepY = CANVAS_SIZE * (0.84 - sweepProgress * 0.68);
+            const sweepGradient = ctx.createLinearGradient(0, sweepY - 34, 0, sweepY + 34);
+            sweepGradient.addColorStop(0, hexToRgba(COLORS.dayAccent, 0));
+            sweepGradient.addColorStop(0.5, hexToRgba(COLORS.dayBall, 0.36 + surgeIntensity * 0.1));
+            sweepGradient.addColorStop(1, hexToRgba(COLORS.dayAccent, 0));
+            ctx.globalAlpha = clamp(0.12 + surgeIntensity * 0.12, 0, 0.32);
+            ctx.fillStyle = sweepGradient;
+            ctx.fillRect(0, sweepY - 34, CANVAS_SIZE, 68);
+            ctx.globalAlpha = 1;
+        }
+
         ctx.strokeStyle = COLORS.gridLine;
         ctx.lineWidth = 1;
         for (let column = 0; column <= GRID_WIDTH; column += 1) {
@@ -1840,6 +1901,7 @@ export const useGameLoop = (
         boardPulsesRef.current = [];
         boardSlashesRef.current = [];
         impactFlashesRef.current = [];
+        boardSurgeRef.current = { life: 0, intensity: 0 };
         paddleImpactRef.current = {
             player: { life: 0, intensity: 0, edgeBias: 0 },
             rival: { life: 0, intensity: 0, edgeBias: 0 },
