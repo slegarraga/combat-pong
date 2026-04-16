@@ -165,6 +165,11 @@ interface BoardSurgeState {
     intensity: number;
 }
 
+interface LastChanceState {
+    life: number;
+    intensity: number;
+}
+
 interface TouchControlState {
     activeId: number;
     startClientX: number;
@@ -241,6 +246,7 @@ export const useGameLoop = (
     });
     const ballImpactRef = useRef<Record<string, BallImpactState>>({});
     const boardSurgeRef = useRef<BoardSurgeState>({ life: 0, intensity: 0 });
+    const lastChanceRef = useRef<LastChanceState>({ life: 0, intensity: 0 });
     const touchControlRef = useRef<TouchControlState | null>(null);
     const hitStopRef = useRef(0);
     const shakeRef = useRef({ x: 0, y: 0, intensity: 0 });
@@ -251,6 +257,7 @@ export const useGameLoop = (
     const lastNarrationRef = useRef(0);
     const lastPingShiftRef = useRef(0);
     const lastCountdownCueRef = useRef<number | null>(null);
+    const lastChanceCueRef = useRef<number | null>(null);
     const openingHookReturnsRef = useRef(0);
     const bestStreakRef = useRef(0);
     const streakRef = useRef(0);
@@ -344,6 +351,14 @@ export const useGameLoop = (
             life: 1,
             intensity: Math.max(boardSurgeRef.current.intensity, intensity),
         };
+    };
+
+    const triggerLastChance = (intensity = 1) => {
+        lastChanceRef.current = {
+            life: 1,
+            intensity: Math.max(lastChanceRef.current.intensity, intensity),
+        };
+        triggerBoardSurge(Math.min(1.42, 0.42 + intensity * 0.34));
     };
 
     const triggerHitStop = (owner: 'player' | 'rival', impactPower: number) => {
@@ -622,6 +637,8 @@ export const useGameLoop = (
 
         boardSurgeRef.current.life = Math.max(0, boardSurgeRef.current.life - (0.052 + boardSurgeRef.current.intensity * 0.006) * delta);
         boardSurgeRef.current.intensity *= Math.pow(0.95, delta);
+        lastChanceRef.current.life = Math.max(0, lastChanceRef.current.life - (0.045 + lastChanceRef.current.intensity * 0.006) * delta);
+        lastChanceRef.current.intensity *= Math.pow(0.962, delta);
     };
 
     const updateShake = () => {
@@ -694,6 +711,54 @@ export const useGameLoop = (
                 );
             }
         }
+
+        const streakOverdrive = getStreakOverdrive(streakRef.current);
+        const comebackPressure = clamp((state.nightScore - state.dayScore) / 28, 0, 1);
+        const lastChanceIntensity = remaining <= 6
+            ? clamp(
+                ((6 - remaining) / 6) * 0.38
+                    + streakOverdrive * 0.12
+                    + comebackPressure * 0.54,
+                0,
+                1.36,
+            )
+            : 0;
+
+        if (lastChanceIntensity > 0.08) {
+            triggerLastChance(lastChanceIntensity);
+        }
+
+        if (roundedRemaining > 6) {
+            lastChanceCueRef.current = null;
+        } else if (
+            roundedRemaining > 0
+            && roundedRemaining !== lastChanceCueRef.current
+            && lastChanceIntensity > 0.16
+        ) {
+            lastChanceCueRef.current = roundedRemaining;
+            emitBoardPulse(
+                CANVAS_SIZE / 2,
+                CANVAS_SIZE * 0.78,
+                comebackPressure > 0.2 ? COLORS.warning : COLORS.dayAccent,
+                CANVAS_SIZE * (0.16 + lastChanceIntensity * 0.07),
+                1 + lastChanceIntensity * 0.4,
+            );
+            playOverdrivePulseSound(Math.max(1, streakOverdrive) + lastChanceIntensity * 2.2);
+
+            if ([6, 4, 2].includes(roundedRemaining)) {
+                emitFloatingText(
+                    roundedRemaining === 6
+                        ? comebackPressure > 0.2 ? 'Take it back' : 'No letup'
+                        : roundedRemaining === 4
+                            ? 'Final push'
+                            : 'One clean touch',
+                    CANVAS_SIZE / 2,
+                    CANVAS_SIZE * 0.22,
+                    roundedRemaining === 2 ? COLORS.dayBall : comebackPressure > 0.2 ? COLORS.warning : COLORS.dayAccent,
+                    roundedRemaining === 2 ? 28 : 24,
+                );
+            }
+        }
     };
 
     const recomputeScore = (ownership: Team[]) => {
@@ -729,11 +794,12 @@ export const useGameLoop = (
         const distance = paddle.targetX - paddle.x;
         const catchUp = clamp(Math.abs(distance) / 72, 0, 1);
         const clutchBonus = clutchDriveRef.current * 0.05;
-        const response = PADDLE_TARGET_RESPONSE + catchUp * 0.32 + clutchBonus;
+        const lastChanceBoost = lastChanceRef.current.life * lastChanceRef.current.intensity;
+        const response = PADDLE_TARGET_RESPONSE + catchUp * 0.32 + clutchBonus + lastChanceBoost * 0.06;
         const desiredVelocity = clamp(
             distance * response,
-            -PADDLE_MAX_TRAVEL_SPEED,
-            PADDLE_MAX_TRAVEL_SPEED,
+            -PADDLE_MAX_TRAVEL_SPEED * (1 + lastChanceBoost * 0.08),
+            PADDLE_MAX_TRAVEL_SPEED * (1 + lastChanceBoost * 0.08),
         );
         const blend = PADDLE_TARGET_BLEND + catchUp * 0.24;
 
@@ -827,7 +893,8 @@ export const useGameLoop = (
         clamp(
             PADDLE_RETURN_GRACE_BASE
                 + Math.abs(paddle.velocity) * PADDLE_RETURN_GRACE_VELOCITY_STEP
-                + streakRef.current * PADDLE_RETURN_GRACE_STREAK_STEP,
+                + streakRef.current * PADDLE_RETURN_GRACE_STREAK_STEP
+                + lastChanceRef.current.life * lastChanceRef.current.intensity * 5.5,
             PADDLE_RETURN_GRACE_BASE,
             PADDLE_RETURN_GRACE_MAX,
         );
@@ -843,6 +910,7 @@ export const useGameLoop = (
         const hitOffset = clamp((ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2), -1, 1);
         const edgeBias = Math.abs(hitOffset);
         const streakOverdrive = owner === 'player' ? getStreakOverdrive(streakRef.current) : 0;
+        const lastChanceDrive = owner === 'player' ? lastChanceRef.current.life * lastChanceRef.current.intensity : 0;
         const edgePower = owner === 'player'
             ? clamp((edgeBias - PADDLE_EDGE_WINDOW_START) / PADDLE_EDGE_WINDOW_RANGE, 0, 1)
             : clamp((edgeBias - (PADDLE_EDGE_WINDOW_START + 0.1)) / (PADDLE_EDGE_WINDOW_RANGE + 0.12), 0, 0.42);
@@ -871,6 +939,18 @@ export const useGameLoop = (
                     COLORS.dayBall,
                     13 + streakOverdrive * 1.2,
                 );
+            }
+
+            if (lastChanceDrive > 0.18) {
+                ball.cutCharge = clamp(
+                    ball.cutCharge + 0.08 + lastChanceDrive * 0.06 + edgePower * 0.05,
+                    0,
+                    BALL_CUT_CHARGE_MAX,
+                );
+
+                if (impactPower > 0.64) {
+                    ball.captureCharge = clamp(ball.captureCharge + 1, 0, MAX_CAPTURE_CHARGE);
+                }
             }
 
             if (impactPower > 0.82) {
@@ -968,6 +1048,7 @@ export const useGameLoop = (
                 + ball.captureCharge * 0.16
                 + impactPower * 1.08
                 + (assisted ? 0.22 : 0)
+                + lastChanceDrive * 0.26
                 + edgeSpeedBonus
                 + overdriveSpeedBonus
                 + (openingHookActive ? OPENING_HOOK_SPEED_BONUS + impactPower * 0.22 : 0)
@@ -992,10 +1073,14 @@ export const useGameLoop = (
             impactPower
                 + edgePower * PADDLE_EDGE_IMPACT_BONUS
                 + streakOverdrive * STREAK_OVERDRIVE_IMPACT_STEP
-                + (assisted ? 0.12 : 0),
+                + (assisted ? 0.12 : 0)
+                + lastChanceDrive * 0.14,
             0,
             1.72,
         );
+        if (lastChanceDrive > 0.16) {
+            triggerBoardSurge(clamp(0.48 + lastChanceDrive * 0.3 + impactPower * 0.08, 0.48, 1.42));
+        }
         triggerContactSnap(ball, owner, expressiveImpact, hitOffset, effectColor);
         const impactBurst = Math.round(expressiveImpact * 6 + edgePower * 4);
         triggerShake(
@@ -1110,13 +1195,16 @@ export const useGameLoop = (
         const clutchDamageBonus = ball.team === 'day' && timeCacheRef.current <= CLUTCH_SWING_WINDOW
             ? CLUTCH_SWING_DAMAGE_BONUS
             : 0;
+        const lastChanceDamageBonus = ball.team === 'day'
+            ? Math.floor(lastChanceRef.current.life * lastChanceRef.current.intensity * 2.6)
+            : 0;
         const comebackDamageBonus =
             ball.team === 'day'
             && timeCacheRef.current <= CLUTCH_SWING_WINDOW
             && state.nightScore - state.dayScore >= CLUTCH_COMEBACK_MARGIN
                 ? CLUTCH_COMEBACK_DAMAGE_BONUS
                 : 0;
-        const destructionBonus = speedDamageBonus + streakDamageBonus + openingDamageBonus + clutchDamageBonus + comebackDamageBonus;
+        const destructionBonus = speedDamageBonus + streakDamageBonus + openingDamageBonus + clutchDamageBonus + comebackDamageBonus + lastChanceDamageBonus;
         const centerCol = clamp(Math.floor(ball.x / TILE_SIZE), 0, GRID_WIDTH - 1);
         const centerRow = clamp(Math.floor(ball.y / TILE_SIZE), 0, GRID_HEIGHT - 1);
         const searchRadius = 1
@@ -1416,7 +1504,9 @@ export const useGameLoop = (
 
         const streakOverdrive = getStreakOverdrive(streakRef.current);
         const boardSurge = boardSurgeRef.current;
+        const lastChance = lastChanceRef.current;
         const surgeIntensity = clamp(boardSurge.life * boardSurge.intensity + streakOverdrive * 0.08, 0, 1.45);
+        const lastChanceDrive = clamp(lastChance.life * lastChance.intensity, 0, 1.4);
         if (surgeIntensity > 0.01) {
             const floorGlow = ctx.createLinearGradient(0, CANVAS_SIZE, 0, CANVAS_SIZE * 0.08);
             floorGlow.addColorStop(0, hexToRgba(COLORS.dayAccent, 0.28 + surgeIntensity * 0.12));
@@ -1435,6 +1525,34 @@ export const useGameLoop = (
             ctx.globalAlpha = clamp(0.12 + surgeIntensity * 0.12, 0, 0.32);
             ctx.fillStyle = sweepGradient;
             ctx.fillRect(0, sweepY - 34, CANVAS_SIZE, 68);
+            ctx.globalAlpha = 1;
+        }
+
+        if (lastChanceDrive > 0.02) {
+            const finalGlow = ctx.createRadialGradient(
+                CANVAS_SIZE / 2,
+                CANVAS_SIZE * 0.86,
+                CANVAS_SIZE * 0.05,
+                CANVAS_SIZE / 2,
+                CANVAS_SIZE * 0.86,
+                CANVAS_SIZE * 0.82,
+            );
+            finalGlow.addColorStop(0, hexToRgba(COLORS.dayBall, 0.3 + lastChanceDrive * 0.08));
+            finalGlow.addColorStop(0.26, hexToRgba(COLORS.dayAccent, 0.16 + lastChanceDrive * 0.1));
+            finalGlow.addColorStop(1, hexToRgba(COLORS.dayAccent, 0));
+            ctx.globalAlpha = clamp(0.16 + lastChanceDrive * 0.18, 0, 0.42);
+            ctx.fillStyle = finalGlow;
+            ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+            const squeezeProgress = (lastFrameRef.current / 320) % 1;
+            const squeezeY = CANVAS_SIZE * (0.78 - squeezeProgress * 0.5);
+            const squeezeGradient = ctx.createLinearGradient(0, squeezeY - 24, 0, squeezeY + 24);
+            squeezeGradient.addColorStop(0, hexToRgba(COLORS.dayAccent, 0));
+            squeezeGradient.addColorStop(0.5, hexToRgba(COLORS.dayBall, 0.34 + lastChanceDrive * 0.08));
+            squeezeGradient.addColorStop(1, hexToRgba(COLORS.dayAccent, 0));
+            ctx.globalAlpha = clamp(0.1 + lastChanceDrive * 0.14, 0, 0.28);
+            ctx.fillStyle = squeezeGradient;
+            ctx.fillRect(0, squeezeY - 24, CANVAS_SIZE, 48);
             ctx.globalAlpha = 1;
         }
 
@@ -1902,6 +2020,7 @@ export const useGameLoop = (
         boardSlashesRef.current = [];
         impactFlashesRef.current = [];
         boardSurgeRef.current = { life: 0, intensity: 0 };
+        lastChanceRef.current = { life: 0, intensity: 0 };
         paddleImpactRef.current = {
             player: { life: 0, intensity: 0, edgeBias: 0 },
             rival: { life: 0, intensity: 0, edgeBias: 0 },
@@ -1919,6 +2038,7 @@ export const useGameLoop = (
         leadStateRef.current = 'neutral';
         clutchDriveRef.current = 0;
         lastCountdownCueRef.current = null;
+        lastChanceCueRef.current = null;
         phaseRef.current = 'OPENING';
         momentumRef.current = 12;
         scoreCacheRef.current = initialScore;
