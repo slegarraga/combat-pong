@@ -111,6 +111,12 @@ interface BoardPulse {
     intensity: number;
 }
 
+interface TileEcho {
+    owner: Team;
+    life: number;
+    intensity: number;
+}
+
 interface BoardSlash {
     x1: number;
     y1: number;
@@ -205,6 +211,7 @@ export const useGameLoop = (
     const particlesRef = useRef<Particle[]>([]);
     const ringsRef = useRef<ImpactRing[]>([]);
     const floatingTextsRef = useRef<FloatingText[]>([]);
+    const tileEchoesRef = useRef<Record<string, TileEcho>>({});
     const boardPulsesRef = useRef<BoardPulse[]>([]);
     const boardSlashesRef = useRef<BoardSlash[]>([]);
     const impactFlashesRef = useRef<ImpactFlash[]>([]);
@@ -318,6 +325,15 @@ export const useGameLoop = (
             color,
             size,
         });
+    };
+
+    const markTileEcho = (index: number, owner: Team, intensity = 1) => {
+        const previous = tileEchoesRef.current[index];
+        tileEchoesRef.current[index] = {
+            owner,
+            life: 1,
+            intensity: Math.max(intensity, previous?.intensity ?? 0),
+        };
     };
 
     const emitBoardPulse = (x: number, y: number, color: string, radius = TILE_SIZE * 1.2, intensity = 1) => {
@@ -487,6 +503,19 @@ export const useGameLoop = (
                 floatingTextsRef.current.splice(index, 1);
             }
         }
+
+        const nextTileEchoes: Record<string, TileEcho> = {};
+        for (const [key, echo] of Object.entries(tileEchoesRef.current)) {
+            const nextLife = echo.life - (0.05 + echo.intensity * 0.008) * delta;
+            if (nextLife <= 0) continue;
+
+            nextTileEchoes[key] = {
+                ...echo,
+                life: nextLife,
+                intensity: echo.intensity * Math.pow(0.94, delta),
+            };
+        }
+        tileEchoesRef.current = nextTileEchoes;
 
         for (let index = boardPulsesRef.current.length - 1; index >= 0; index -= 1) {
             const pulse = boardPulsesRef.current[index];
@@ -1076,6 +1105,11 @@ export const useGameLoop = (
         for (let index = 0; index < captureTargets.length; index += 1) {
             const target = captureTargets[index];
             ownership[target.index] = ball.team;
+            markTileEcho(
+                target.index,
+                ball.team,
+                destructionIntensity + (index >= captureCount ? 0.24 : 0.08),
+            );
             emitBoardPulse(
                 target.tileCenterX,
                 target.tileCenterY,
@@ -1285,12 +1319,102 @@ export const useGameLoop = (
             for (let column = 0; column < GRID_WIDTH; column += 1) {
                 const index = column + row * GRID_WIDTH;
                 const owner = state.ownership[index];
+                const x = column * TILE_SIZE + 1;
+                const y = row * TILE_SIZE + 1;
+                const echo = tileEchoesRef.current[index];
+                const baseAlpha = owner === 'day' ? 0.92 : 0.94;
+                const accentColor = owner === 'day' ? COLORS.dayAccent : COLORS.nightAccent;
+
                 ctx.fillStyle = owner === 'day' ? COLORS.day : COLORS.night;
-                ctx.globalAlpha = owner === 'day' ? 0.92 : 0.94;
-                ctx.fillRect(column * TILE_SIZE + 1, row * TILE_SIZE + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+                ctx.globalAlpha = baseAlpha;
+                ctx.fillRect(x, y, TILE_SIZE - 2, TILE_SIZE - 2);
+
+                if (echo) {
+                    const echoAlpha = clamp(echo.life * (0.12 + echo.intensity * 0.12), 0, 0.36);
+                    const echoAccent = echo.owner === 'day' ? COLORS.dayAccent : COLORS.nightAccent;
+                    ctx.fillStyle = hexToRgba(echoAccent, echoAlpha);
+                    ctx.globalAlpha = 1;
+                    ctx.fillRect(x + 1.5, y + 1.5, TILE_SIZE - 5, TILE_SIZE - 5);
+                }
+
+                ctx.globalAlpha = 1;
+                ctx.strokeStyle = hexToRgba(accentColor, owner === 'day' ? 0.05 : 0.045);
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 3, TILE_SIZE - 3);
             }
         }
         ctx.globalAlpha = 1;
+
+        const frontierBaseAlpha = 0.08 + clutchDriveRef.current * 0.12;
+        const frontierGlowAlpha = 0.15 + clutchDriveRef.current * 0.12;
+        ctx.save();
+        ctx.lineCap = 'round';
+
+        for (let row = 0; row < GRID_HEIGHT; row += 1) {
+            for (let column = 0; column < GRID_WIDTH; column += 1) {
+                const index = column + row * GRID_WIDTH;
+                const owner = state.ownership[index];
+                const echoIntensity = tileEchoesRef.current[index]?.life ?? 0;
+
+                if (column < GRID_WIDTH - 1) {
+                    const rightIndex = index + 1;
+                    const rightOwner = state.ownership[rightIndex];
+                    if (owner !== rightOwner) {
+                        const rightEcho = tileEchoesRef.current[rightIndex]?.life ?? 0;
+                        const frontierAlpha = frontierBaseAlpha + Math.max(echoIntensity, rightEcho) * 0.22;
+                        const x = (column + 1) * TILE_SIZE;
+                        const y1 = row * TILE_SIZE + 2;
+                        const y2 = (row + 1) * TILE_SIZE - 2;
+
+                        ctx.strokeStyle = owner === 'day'
+                            ? hexToRgba(COLORS.dayAccent, frontierGlowAlpha + frontierAlpha * 0.4)
+                            : hexToRgba(COLORS.nightAccent, frontierGlowAlpha + frontierAlpha * 0.4);
+                        ctx.lineWidth = 2.2 + Math.max(echoIntensity, rightEcho) * 1.2;
+                        ctx.beginPath();
+                        ctx.moveTo(x, y1);
+                        ctx.lineTo(x, y2);
+                        ctx.stroke();
+
+                        ctx.strokeStyle = `rgba(255, 255, 255, ${0.16 + frontierAlpha})`;
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(x, y1);
+                        ctx.lineTo(x, y2);
+                        ctx.stroke();
+                    }
+                }
+
+                if (row < GRID_HEIGHT - 1) {
+                    const belowIndex = index + GRID_WIDTH;
+                    const belowOwner = state.ownership[belowIndex];
+                    if (owner !== belowOwner) {
+                        const belowEcho = tileEchoesRef.current[belowIndex]?.life ?? 0;
+                        const frontierAlpha = frontierBaseAlpha + Math.max(echoIntensity, belowEcho) * 0.22;
+                        const y = (row + 1) * TILE_SIZE;
+                        const x1 = column * TILE_SIZE + 2;
+                        const x2 = (column + 1) * TILE_SIZE - 2;
+
+                        ctx.strokeStyle = belowOwner === 'day'
+                            ? hexToRgba(COLORS.dayAccent, frontierGlowAlpha + frontierAlpha * 0.4)
+                            : hexToRgba(COLORS.nightAccent, frontierGlowAlpha + frontierAlpha * 0.4);
+                        ctx.lineWidth = 2.2 + Math.max(echoIntensity, belowEcho) * 1.2;
+                        ctx.beginPath();
+                        ctx.moveTo(x1, y);
+                        ctx.lineTo(x2, y);
+                        ctx.stroke();
+
+                        ctx.strokeStyle = `rgba(255, 255, 255, ${0.16 + frontierAlpha})`;
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(x1, y);
+                        ctx.lineTo(x2, y);
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+
+        ctx.restore();
 
         ctx.save();
         ctx.globalCompositeOperation = 'screen';
@@ -1594,6 +1718,7 @@ export const useGameLoop = (
         particlesRef.current = [];
         ringsRef.current = [];
         floatingTextsRef.current = [];
+        tileEchoesRef.current = {};
         boardPulsesRef.current = [];
         boardSlashesRef.current = [];
         impactFlashesRef.current = [];
