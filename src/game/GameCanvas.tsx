@@ -16,11 +16,14 @@ import type { Difficulty } from './types';
 interface GameCanvasProps {
     difficulty: Difficulty;
     onBack?: () => void;
+    onChangeDifficulty?: (difficulty: Difficulty) => void;
 }
 
 const arenaViewportStyle = {
     maxWidth: 'min(100%, 72dvh, 42rem)',
 };
+
+const difficultyOrder: Difficulty[] = ['EASY', 'MEDIUM', 'HARD', 'NIGHTMARE'];
 
 const toneClassName: Record<'neutral' | 'positive' | 'warning', string> = {
     neutral: 'text-slate-200 border-white/10 bg-white/5',
@@ -28,7 +31,7 @@ const toneClassName: Record<'neutral' | 'positive' | 'warning', string> = {
     warning: 'text-amber-100 border-amber-300/20 bg-amber-300/10',
 };
 
-export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
+export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanvasProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const {
         score,
@@ -65,6 +68,18 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
     const difficultyMeta = DIFFICULTY[difficulty];
     const clutchActive = timeRemaining <= 15;
     const criticalActive = timeRemaining <= 5;
+    const difficultyIndex = difficultyOrder.indexOf(difficulty);
+    const harderDifficulty = difficultyOrder[difficultyIndex + 1];
+    const easierDifficulty = difficultyOrder[difficultyIndex - 1];
+    const suggestedDifficulty = playerWon ? harderDifficulty : easierDifficulty;
+    const suggestedDifficultyLabel = suggestedDifficulty ? DIFFICULTY[suggestedDifficulty].label : null;
+    const rematchPrompt = playerWon
+        ? margin >= 14
+            ? 'You had the board under control. Push the room hotter.'
+            : 'That finish was close enough to want another one immediately.'
+        : bestStreak >= 4
+            ? 'You had a lane. One cleaner rally flips the result.'
+            : 'The board is still there. Take it back before the rhythm fades.';
 
     const formatTime = (seconds: number) => {
         const minutes = Math.floor(seconds / 60);
@@ -155,6 +170,19 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
         restart();
     }, [restart]);
 
+    const handleDifficultyJump = useCallback((nextDifficulty: Difficulty) => {
+        setHasRecordedGame(false);
+        setShareStatus('idle');
+        setStats(null);
+
+        if (nextDifficulty === difficulty || !onChangeDifficulty) {
+            restart();
+            return;
+        }
+
+        onChangeDifficulty(nextDifficulty);
+    }, [difficulty, onChangeDifficulty, restart]);
+
     const handleShare = async () => {
         setShareStatus('sharing');
         const result = await shareToTwitter({
@@ -212,6 +240,12 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
         const handleHotkeys = (event: KeyboardEvent) => {
             if (event.repeat) return;
 
+            if (gameOver && event.key === 'Enter' && event.shiftKey && suggestedDifficulty) {
+                event.preventDefault();
+                handleDifficultyJump(suggestedDifficulty);
+                return;
+            }
+
             if (gameOver && (event.key === 'Enter' || event.key === ' ')) {
                 event.preventDefault();
                 handleRestart();
@@ -226,7 +260,7 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
 
         window.addEventListener('keydown', handleHotkeys);
         return () => window.removeEventListener('keydown', handleHotkeys);
-    }, [gameOver, handleRestart, togglePause]);
+    }, [gameOver, handleDifficultyJump, handleRestart, suggestedDifficulty, togglePause]);
 
     return (
         <div className="min-h-screen min-h-[100dvh] overflow-hidden bg-[var(--cp-bg)] text-[var(--cp-text)]">
@@ -337,10 +371,10 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
 
                                 {gameOver && (
                                     <div className="absolute inset-0 z-20 flex items-center justify-center rounded-[22px] bg-black/78 px-5 py-6 backdrop-blur-md">
-                                        <div className="w-full max-w-md text-center">
+                                        <div className="w-full max-w-sm text-center">
                                             <p className="cp-kicker">Match complete</p>
                                             <h2
-                                                className="cp-display mt-2 text-4xl font-black sm:text-5xl"
+                                                className="cp-display mt-2 text-3xl font-black sm:text-4xl"
                                                 style={{ color: playerWon ? COLORS.success : COLORS.nightBall }}
                                             >
                                                 {playerWon ? 'Arena secured' : 'Rival held firm'}
@@ -350,8 +384,11 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                                                     ? `You finished with ${dayPercent}% against ${rival.alias}. Queue the next duel while the rhythm is hot.`
                                                     : `${rival.alias} edged it ${nightPercent}% to ${dayPercent}%. Jump back in and take the board right away.`}
                                             </p>
+                                            <p className="mt-3 text-[11px] uppercase tracking-[0.16em] text-[var(--cp-dim)]">
+                                                {rematchPrompt}
+                                            </p>
 
-                                            <div className="mt-5 grid grid-cols-3 gap-3">
+                                            <div className="mt-5 grid grid-cols-3 gap-2">
                                                 <div className="cp-stat-card">
                                                     <span className="cp-stat-label">Margin</span>
                                                     <strong className="cp-stat-value">{Math.abs(margin)}%</strong>
@@ -372,22 +409,47 @@ export const GameCanvas = ({ difficulty, onBack }: GameCanvasProps) => {
                                                 </p>
                                             )}
 
-                                            <div className="mt-5 space-y-3">
+                                            <div className="mt-5 space-y-2.5">
                                                 <button
                                                     onClick={handleRestart}
-                                                    className="btn-gradient w-full justify-center rounded-2xl px-5 py-4 text-base font-bold text-white"
+                                                    className="btn-gradient w-full justify-center rounded-2xl px-5 py-3.5 text-base font-bold text-white"
                                                 >
                                                     Instant rematch
                                                 </button>
-                                                <button
-                                                    onClick={handleShare}
-                                                    disabled={shareStatus === 'sharing'}
-                                                    className="cp-button-secondary w-full justify-center disabled:cursor-wait disabled:opacity-70"
-                                                >
-                                                    {shareLabel}
-                                                </button>
-                                                <p className="text-center text-xs uppercase tracking-[0.18em] text-[var(--cp-dim)]">
-                                                    Press Enter for another run
+                                                <div className="grid gap-2 sm:grid-cols-2">
+                                                    {suggestedDifficulty && suggestedDifficultyLabel ? (
+                                                        <button
+                                                            onClick={() => handleDifficultyJump(suggestedDifficulty)}
+                                                            className="cp-button-secondary w-full justify-center px-4 py-3 text-sm"
+                                                        >
+                                                            {playerWon ? `Raise heat · ${suggestedDifficultyLabel}` : `Reset lower · ${suggestedDifficultyLabel}`}
+                                                        </button>
+                                                    ) : onBack ? (
+                                                        <button
+                                                            onClick={onBack}
+                                                            className="cp-button-secondary w-full justify-center px-4 py-3 text-sm"
+                                                        >
+                                                            Exit arena
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={handleShare}
+                                                            disabled={shareStatus === 'sharing'}
+                                                            className="cp-button-secondary w-full justify-center px-4 py-3 text-sm disabled:cursor-wait disabled:opacity-70"
+                                                        >
+                                                            {shareLabel}
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={handleShare}
+                                                        disabled={shareStatus === 'sharing'}
+                                                        className="cp-button-secondary w-full justify-center px-4 py-3 text-sm disabled:cursor-wait disabled:opacity-70"
+                                                    >
+                                                        {shareLabel}
+                                                    </button>
+                                                </div>
+                                                <p className="text-center text-[11px] uppercase tracking-[0.16em] text-[var(--cp-dim)]">
+                                                    Enter rematch{suggestedDifficulty ? ' · Shift+Enter change heat' : ''}
                                                 </p>
                                             </div>
                                         </div>

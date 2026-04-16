@@ -190,7 +190,13 @@ function App() {
   };
 
   if (route === 'game') {
-    return <GameCanvas difficulty={difficulty} onBack={() => navigateTo('home')} />;
+    return (
+      <GameCanvas
+        difficulty={difficulty}
+        onBack={() => navigateTo('home')}
+        onChangeDifficulty={setDifficulty}
+      />
+    );
   }
 
   if (route === 'mode-easy') return <ModeLandingPage mode="EASY" onPlay={() => startGame('EASY')} onBack={() => navigateTo('home')} />;
