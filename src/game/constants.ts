@@ -48,6 +48,12 @@ export const BALL_CUT_LANE_MAX_BONUS_CAPTURES = 2;
  * rewarding player streaks rather than slow attrition.
  */
 export const OPENING_LAUNCH_SPEED = 6.3;
+export const OPENING_HOOK_WINDOW = 10;
+export const OPENING_HOOK_MAX_RETURNS = 4;
+export const OPENING_HOOK_SPEED_BONUS = 0.46;
+export const OPENING_HOOK_CAPTURE_BONUS = 1;
+export const OPENING_HOOK_CUT_BONUS = 0.18;
+export const OPENING_HOOK_DAMAGE_BONUS = 1;
 export const MAX_SPEED = 14.4;
 export const MIN_SPEED = 5.1;
 export const BASE_ACCELERATION = 0.1;

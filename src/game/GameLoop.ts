@@ -24,6 +24,12 @@ import {
     MATCH_DURATION,
     MAX_SPEED,
     MIN_SPEED,
+    OPENING_HOOK_CAPTURE_BONUS,
+    OPENING_HOOK_CUT_BONUS,
+    OPENING_HOOK_DAMAGE_BONUS,
+    OPENING_HOOK_MAX_RETURNS,
+    OPENING_HOOK_SPEED_BONUS,
+    OPENING_HOOK_WINDOW,
     OPENING_LAUNCH_SPEED,
     PADDLE_DAMPING,
     PADDLE_EDGE_IMPACT_BONUS,
@@ -208,6 +214,7 @@ export const useGameLoop = (
     const lastNarrationRef = useRef(0);
     const lastPingShiftRef = useRef(0);
     const lastCountdownCueRef = useRef<number | null>(null);
+    const openingHookReturnsRef = useRef(0);
     const bestStreakRef = useRef(0);
     const streakRef = useRef(0);
     const scoreCacheRef = useRef<ScoreSnapshot>({ day: 0, night: 0 });
@@ -398,13 +405,17 @@ export const useGameLoop = (
 
     const createBall = useCallback((team: Team, pairIndex: number): Ball => {
         const speed = OPENING_LAUNCH_SPEED * difficultyConfig.speedMod;
+        const pairCount = Math.max(1, difficultyConfig.ballPairs);
+        const laneBias = pairCount === 1 ? 0 : (pairIndex / (pairCount - 1)) * 2 - 1;
+        const laneX = CANVAS_SIZE * 0.5 + laneBias * CANVAS_SIZE * 0.18 + (Math.random() - 0.5) * 12;
+        const driftSeed = (pairIndex % 2 === 0 ? 0.92 : -0.92) + laneBias * 0.34;
         return {
             id: `${team}-${pairIndex}-${Math.random().toString(36).slice(2, 8)}`,
-            x: CANVAS_SIZE * (0.28 + Math.random() * 0.44),
+            x: clamp(laneX, CANVAS_SIZE * 0.18, CANVAS_SIZE * 0.82),
             y: team === 'day'
-                ? CANVAS_SIZE * 0.75 + (Math.random() - 0.5) * 38
-                : CANVAS_SIZE * 0.25 + (Math.random() - 0.5) * 38,
-            vx: speed * (Math.random() > 0.5 ? 1 : -1),
+                ? CANVAS_SIZE * 0.74 + laneBias * 10 + (Math.random() - 0.5) * 22
+                : CANVAS_SIZE * 0.26 - laneBias * 10 + (Math.random() - 0.5) * 22,
+            vx: speed * clamp(driftSeed, -1.3, 1.3),
             vy: team === 'day' ? -speed : speed,
             team,
             speedMultiplier: 1,
@@ -412,7 +423,7 @@ export const useGameLoop = (
             cutCharge: 0,
             trail: [],
         };
-    }, [difficultyConfig.speedMod]);
+    }, [difficultyConfig.ballPairs, difficultyConfig.speedMod]);
 
     const createBalls = useCallback(() => {
         const balls: Ball[] = [];
@@ -711,6 +722,10 @@ export const useGameLoop = (
             ? clamp((edgeBias - PADDLE_EDGE_WINDOW_START) / PADDLE_EDGE_WINDOW_RANGE, 0, 1)
             : clamp((edgeBias - (PADDLE_EDGE_WINDOW_START + 0.1)) / (PADDLE_EDGE_WINDOW_RANGE + 0.12), 0, 0.42);
         const impactPower = clamp(Math.abs(paddle.velocity) / (owner === 'player' ? PADDLE_IMPACT_REFERENCE_SPEED : 26), 0, 1.35);
+        const openingHookActive =
+            owner === 'player'
+            && timeCacheRef.current >= MATCH_DURATION - OPENING_HOOK_WINDOW
+            && openingHookReturnsRef.current < OPENING_HOOK_MAX_RETURNS;
         const edgeDirection = Math.sign(hitOffset) || Math.sign(paddle.velocity);
         const paddleInfluence = paddle.velocity * (0.08 + impactPower * 0.035 + edgePower * 0.02);
         const edgeSpinBoost = edgeDirection * edgePower * (PADDLE_EDGE_SPIN_BONUS + ball.captureCharge * 0.24 + impactPower * 0.9);
@@ -732,6 +747,27 @@ export const useGameLoop = (
                     ball.y - 32,
                     COLORS.dayBall,
                     14 + impactPower * 4,
+                );
+            }
+
+            if (openingHookActive) {
+                openingHookReturnsRef.current += 1;
+                ball.captureCharge = clamp(
+                    ball.captureCharge + OPENING_HOOK_CAPTURE_BONUS + (impactPower > 0.74 ? 1 : 0),
+                    0,
+                    MAX_CAPTURE_CHARGE,
+                );
+                ball.cutCharge = clamp(
+                    ball.cutCharge + OPENING_HOOK_CUT_BONUS + edgePower * 0.08,
+                    0,
+                    BALL_CUT_CHARGE_MAX,
+                );
+                emitFloatingText(
+                    openingHookReturnsRef.current === 1 ? 'First cut' : 'Press',
+                    ball.x,
+                    ball.y - 20,
+                    COLORS.dayAccent,
+                    14 + openingHookReturnsRef.current * 1.6,
                 );
             }
 
@@ -765,7 +801,13 @@ export const useGameLoop = (
         const edgeSpeedBonus = edgePower * (PADDLE_EDGE_SPEED_BONUS + impactPower * PADDLE_EDGE_IMPACT_BONUS);
         const overdriveSpeedBonus = streakOverdrive * (0.14 + impactPower * 0.06);
         const speedBoost = owner === 'player'
-            ? PLAYER_RETURN_BOOST + Math.abs(hitOffset) * 0.54 + ball.captureCharge * 0.16 + impactPower * 1.08 + edgeSpeedBonus + overdriveSpeedBonus
+            ? PLAYER_RETURN_BOOST
+                + Math.abs(hitOffset) * 0.54
+                + ball.captureCharge * 0.16
+                + impactPower * 1.08
+                + edgeSpeedBonus
+                + overdriveSpeedBonus
+                + (openingHookActive ? OPENING_HOOK_SPEED_BONUS + impactPower * 0.22 : 0)
             : RIVAL_RETURN_BOOST + state.rival.aggression * 0.12 + impactPower * 0.34 + edgeSpeedBonus * 0.32;
 
         const targetSpeed = clamp(
@@ -876,7 +918,10 @@ export const useGameLoop = (
         const streakDamageBonus = ball.team === 'day'
             ? Math.min(4, Math.floor((streakOverdrive + Math.max(0, streakRef.current - 2)) / 2))
             : 0;
-        const destructionBonus = speedDamageBonus + streakDamageBonus;
+        const openingDamageBonus = ball.team === 'day' && timeCacheRef.current >= MATCH_DURATION - OPENING_HOOK_WINDOW
+            ? OPENING_HOOK_DAMAGE_BONUS
+            : 0;
+        const destructionBonus = speedDamageBonus + streakDamageBonus + openingDamageBonus;
         const centerCol = clamp(Math.floor(ball.x / TILE_SIZE), 0, GRID_WIDTH - 1);
         const centerRow = clamp(Math.floor(ball.y / TILE_SIZE), 0, GRID_HEIGHT - 1);
         const searchRadius = 1
@@ -920,7 +965,12 @@ export const useGameLoop = (
         candidates.sort((left, right) => left.distance - right.distance);
         const captureCount = Math.min(
             candidates.length,
-            1 + ball.captureCharge + overdriveCaptureBonus + speedDamageBonus + Math.ceil(streakDamageBonus * 0.7),
+            1
+                + ball.captureCharge
+                + overdriveCaptureBonus
+                + speedDamageBonus
+                + Math.ceil(streakDamageBonus * 0.7)
+                + openingDamageBonus,
         );
         const primary = candidates[0];
         const captureTargets = candidates.slice(0, captureCount);
@@ -954,10 +1004,20 @@ export const useGameLoop = (
                     .slice(
                         0,
                         Math.min(
-                            BALL_CUT_LANE_MAX_BONUS_CAPTURES + overdriveCaptureBonus + Math.min(speedDamageBonus, 2) + Math.min(2, Math.floor(streakDamageBonus / 2)),
+                            BALL_CUT_LANE_MAX_BONUS_CAPTURES
+                                + overdriveCaptureBonus
+                                + Math.min(speedDamageBonus, 2)
+                                + Math.min(2, Math.floor(streakDamageBonus / 2))
+                                + openingDamageBonus,
                             Math.max(
                                 1,
-                                Math.round(ball.cutCharge + overdriveCaptureBonus + speedDamageBonus * 0.75 + streakDamageBonus * 0.45),
+                                Math.round(
+                                    ball.cutCharge
+                                    + overdriveCaptureBonus
+                                    + speedDamageBonus * 0.75
+                                    + streakDamageBonus * 0.45
+                                    + openingDamageBonus * 0.65,
+                                ),
                             ),
                         ),
                     )
@@ -1023,7 +1083,7 @@ export const useGameLoop = (
             );
         }
 
-        playTileBreakSound(captureTargets.length, ball.team);
+        playTileBreakSound(captureTargets.length, ball.team, destructionBonus);
         const captureDrain = destructionBonus >= 5 ? 0 : destructionBonus >= 2 ? 0.5 : 1;
         const cutDrain = Math.max(0.36, 0.82 - destructionBonus * 0.08);
         ball.captureCharge = Math.max(0, ball.captureCharge - captureDrain);
@@ -1503,6 +1563,7 @@ export const useGameLoop = (
         gameOverRef.current = false;
         lastNarrationRef.current = 0;
         lastPingShiftRef.current = performance.now();
+        openingHookReturnsRef.current = 0;
         bestStreakRef.current = 0;
         streakRef.current = 0;
         leadStateRef.current = 'neutral';

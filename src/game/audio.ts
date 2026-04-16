@@ -257,7 +257,7 @@ export const playClutchPulseSound = (secondsLeft: number) => {
     });
 };
 
-export const playTileBreakSound = (captureCount: number, team: 'day' | 'night') => {
+export const playTileBreakSound = (captureCount: number, team: 'day' | 'night', intensity = 0) => {
     withAudio((context) => {
         const frequency = team === 'day' ? 170 + captureCount * 34 : 145 + captureCount * 24;
 
@@ -277,6 +277,16 @@ export const playTileBreakSound = (captureCount: number, team: 'day' | 'night') 
                 gain: 0.01 + captureCount * 0.002,
                 type: 'triangle',
                 delay: 0.015,
+            });
+        }
+
+        if (team === 'day' && intensity > 2) {
+            playVoice(context, {
+                frequency: Math.max(72, frequency * 0.48),
+                endFrequency: Math.max(52, frequency * 0.22),
+                duration: 0.08 + Math.min(intensity, 6) * 0.008,
+                gain: 0.01 + Math.min(intensity, 6) * 0.0025,
+                type: 'sawtooth',
             });
         }
     });
