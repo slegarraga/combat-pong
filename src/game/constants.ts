@@ -56,7 +56,11 @@ export const RIVAL_RETURN_BOOST = 0.34;
 export const PLAYER_SPIN_FACTOR = 7.8;
 export const RIVAL_SPIN_FACTOR = 6.1;
 export const STREAK_SPEED_STEP = 0.18;
-export const MAX_CAPTURE_CHARGE = 4;
+export const STREAK_OVERDRIVE_START = 4;
+export const STREAK_OVERDRIVE_SPEED_STEP = 0.2;
+export const STREAK_OVERDRIVE_IMPACT_STEP = 0.26;
+export const STREAK_OVERDRIVE_CAPTURE_STEP = 2;
+export const MAX_CAPTURE_CHARGE = 7;
 export const BALL_RADIUS = TILE_SIZE / 2;
 export const TRAIL_LENGTH = 7;
 

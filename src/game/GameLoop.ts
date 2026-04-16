@@ -45,6 +45,10 @@ import {
     RIVAL_RETURN_BOOST,
     RIVAL_SPIN_FACTOR,
     STREAK_SPEED_STEP,
+    STREAK_OVERDRIVE_CAPTURE_STEP,
+    STREAK_OVERDRIVE_IMPACT_STEP,
+    STREAK_OVERDRIVE_SPEED_STEP,
+    STREAK_OVERDRIVE_START,
     TILE_SIZE,
     TRAIL_LENGTH,
 } from './constants';
@@ -86,6 +90,9 @@ const AI_PADDLE_Y = PADDLE_OFFSET;
 
 const clamp = (value: number, min: number, max: number) =>
     Math.min(max, Math.max(min, value));
+
+const getStreakOverdrive = (streak: number) =>
+    Math.max(0, streak - STREAK_OVERDRIVE_START + 1);
 
 const maybeRoundRect = (
     ctx: CanvasRenderingContext2D,
@@ -454,12 +461,27 @@ export const useGameLoop = (
         bestStreakRef.current = Math.max(bestStreakRef.current, streakRef.current);
         setStreak(streakRef.current);
         setBestStreak(bestStreakRef.current);
+        const streakOverdrive = getStreakOverdrive(streakRef.current);
+        const overdriveCaptureBonus = Math.floor(streakOverdrive / STREAK_OVERDRIVE_CAPTURE_STEP);
 
-        ball.speedMultiplier = clamp(1 + streakRef.current * STREAK_SPEED_STEP, 1, 3.2);
-        ball.captureCharge = clamp(Math.floor(streakRef.current / 2), 0, MAX_CAPTURE_CHARGE);
+        ball.speedMultiplier = clamp(
+            1 + streakRef.current * STREAK_SPEED_STEP + streakOverdrive * STREAK_OVERDRIVE_SPEED_STEP,
+            1,
+            4.2,
+        );
+        ball.captureCharge = clamp(
+            Math.floor(streakRef.current / 2) + overdriveCaptureBonus + (streakOverdrive > 0 ? 1 : 0),
+            0,
+            MAX_CAPTURE_CHARGE,
+        );
 
         if (streakRef.current % 2 === 0 && ball.captureCharge > 0) {
             emitFloatingText(`Charge +${ball.captureCharge}`, ball.x, ball.y - 18, COLORS.dayBall, 16 + ball.captureCharge);
+        }
+
+        if ([STREAK_OVERDRIVE_START, STREAK_OVERDRIVE_START + 3, STREAK_OVERDRIVE_START + 6].includes(streakRef.current)) {
+            emitFloatingText('Overdrive', ball.x, ball.y - 46, COLORS.dayAccent, 20 + streakOverdrive * 1.2);
+            narrate('High streaks now rip deeper through the board.', 'positive', 0);
         }
 
         if (streakRef.current === 2) {
@@ -487,6 +509,7 @@ export const useGameLoop = (
     ) => {
         const hitOffset = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
         const edgeBias = Math.abs(hitOffset);
+        const streakOverdrive = owner === 'player' ? getStreakOverdrive(streakRef.current) : 0;
         const edgePower = owner === 'player'
             ? clamp((edgeBias - PADDLE_EDGE_WINDOW_START) / PADDLE_EDGE_WINDOW_RANGE, 0, 1)
             : clamp((edgeBias - (PADDLE_EDGE_WINDOW_START + 0.1)) / (PADDLE_EDGE_WINDOW_RANGE + 0.12), 0, 0.42);
@@ -500,7 +523,12 @@ export const useGameLoop = (
         if (owner === 'player') {
             awardPlayerStreak(state, ball);
             if (impactPower > 0.82) {
-                ball.captureCharge = clamp(ball.captureCharge + 1, 0, MAX_CAPTURE_CHARGE);
+                const heavyHitBonus = impactPower > 1.06 ? 2 : 1;
+                ball.captureCharge = clamp(
+                    ball.captureCharge + heavyHitBonus + Math.floor(streakOverdrive / STREAK_OVERDRIVE_CAPTURE_STEP),
+                    0,
+                    MAX_CAPTURE_CHARGE,
+                );
                 emitFloatingText(
                     impactPower > 1.08 ? 'Heavy hit' : 'Fast hit',
                     ball.x,
@@ -512,7 +540,7 @@ export const useGameLoop = (
 
             if (edgePower > 0.54) {
                 ball.cutCharge = clamp(
-                    ball.cutCharge + edgePower * PADDLE_EDGE_CUT_CHARGE + impactPower * 0.14,
+                    ball.cutCharge + edgePower * PADDLE_EDGE_CUT_CHARGE + impactPower * 0.14 + streakOverdrive * 0.06,
                     0,
                     BALL_CUT_CHARGE_MAX,
                 );
@@ -538,8 +566,9 @@ export const useGameLoop = (
         }
 
         const edgeSpeedBonus = edgePower * (PADDLE_EDGE_SPEED_BONUS + impactPower * PADDLE_EDGE_IMPACT_BONUS);
+        const overdriveSpeedBonus = streakOverdrive * (0.14 + impactPower * 0.06);
         const speedBoost = owner === 'player'
-            ? PLAYER_RETURN_BOOST + Math.abs(hitOffset) * 0.54 + ball.captureCharge * 0.16 + impactPower * 1.08 + edgeSpeedBonus
+            ? PLAYER_RETURN_BOOST + Math.abs(hitOffset) * 0.54 + ball.captureCharge * 0.16 + impactPower * 1.08 + edgeSpeedBonus + overdriveSpeedBonus
             : RIVAL_RETURN_BOOST + state.rival.aggression * 0.12 + impactPower * 0.34 + edgeSpeedBonus * 0.32;
 
         const targetSpeed = clamp(
@@ -556,7 +585,11 @@ export const useGameLoop = (
         ball.vy *= ratio;
 
         const effectColor = ball.team === 'day' ? COLORS.dayAccent : COLORS.nightAccent;
-        const expressiveImpact = clamp(impactPower + edgePower * PADDLE_EDGE_IMPACT_BONUS, 0, 1.45);
+        const expressiveImpact = clamp(
+            impactPower + edgePower * PADDLE_EDGE_IMPACT_BONUS + streakOverdrive * STREAK_OVERDRIVE_IMPACT_STEP,
+            0,
+            1.72,
+        );
         const impactBurst = Math.round(expressiveImpact * 6 + edgePower * 4);
         triggerShake(
             owner === 'player'
@@ -623,9 +656,14 @@ export const useGameLoop = (
      * This is the main satisfaction lever in the game: clean returns do not
      * only make the rally faster, they also make each successful invasion feel
      * dramatically more valuable.
+     *
+     * Very fast player balls get an additional capture bonus so hot streaks
+     * visibly chew wider holes through enemy territory.
      */
     const detectTileCollision = (ball: Ball, ownership: Team[]) => {
         const enemyTeam: Team = ball.team === 'day' ? 'night' : 'day';
+        const streakOverdrive = ball.team === 'day' ? getStreakOverdrive(streakRef.current) : 0;
+        const overdriveCaptureBonus = Math.floor(streakOverdrive / STREAK_OVERDRIVE_CAPTURE_STEP);
         const centerCol = clamp(Math.floor(ball.x / TILE_SIZE), 0, GRID_WIDTH - 1);
         const centerRow = clamp(Math.floor(ball.y / TILE_SIZE), 0, GRID_HEIGHT - 1);
         const searchRadius = 1 + Math.min(ball.captureCharge, 2) + (ball.cutCharge >= 0.6 ? 1 : 0);
@@ -662,11 +700,17 @@ export const useGameLoop = (
         }
 
         candidates.sort((left, right) => left.distance - right.distance);
-        const captureCount = Math.min(candidates.length, 1 + ball.captureCharge);
+        const travelSpeed = Math.hypot(ball.vx, ball.vy) || 1;
+        const speedCaptureBonus = ball.team === 'day'
+            ? Math.floor(clamp((travelSpeed - OPENING_LAUNCH_SPEED * difficultyConfig.speedMod) / 2.4, 0, 3))
+            : 0;
+        const captureCount = Math.min(
+            candidates.length,
+            1 + ball.captureCharge + overdriveCaptureBonus + speedCaptureBonus,
+        );
         const primary = candidates[0];
         const captureTargets = candidates.slice(0, captureCount);
         const effectColor = ball.team === 'day' ? COLORS.dayAccent : COLORS.nightAccent;
-        const travelSpeed = Math.hypot(ball.vx, ball.vy) || 1;
         const directionX = ball.vx / travelSpeed;
         const directionY = ball.vy / travelSpeed;
         const laneTargets =
@@ -693,7 +737,13 @@ export const useGameLoop = (
                         && candidate.lateral <= BALL_CUT_LANE_WIDTH * (0.9 + ball.cutCharge * 0.4),
                     )
                     .sort((left, right) => right.laneScore - left.laneScore || left.distance - right.distance)
-                    .slice(0, Math.min(BALL_CUT_LANE_MAX_BONUS_CAPTURES, Math.max(1, Math.round(ball.cutCharge))))
+                    .slice(
+                        0,
+                        Math.min(
+                            BALL_CUT_LANE_MAX_BONUS_CAPTURES + overdriveCaptureBonus + Math.min(speedCaptureBonus, 1),
+                            Math.max(1, Math.round(ball.cutCharge + overdriveCaptureBonus + speedCaptureBonus * 0.5)),
+                        ),
+                    )
                 : [];
 
         captureTargets.push(...laneTargets);
@@ -719,9 +769,11 @@ export const useGameLoop = (
         }
 
         if (captureTargets.length > 1) {
-            triggerShake(3 + captureTargets.length * 0.85 + ball.cutCharge * 1.1);
+            triggerShake(3 + captureTargets.length * 0.9 + ball.cutCharge * 1.1 + speedCaptureBonus * 0.75);
             emitFloatingText(
-                laneTargets.length > 0 ? 'Lane break' : `${captureTargets.length}-tile break`,
+                laneTargets.length > 0
+                    ? streakOverdrive > 0 ? 'Overdrive break' : 'Lane break'
+                    : speedCaptureBonus > 1 ? 'Shock break' : `${captureTargets.length}-tile break`,
                 ball.x,
                 ball.y - 14,
                 effectColor,

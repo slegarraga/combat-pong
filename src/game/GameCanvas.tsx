@@ -9,8 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { isArenaAudioEnabled, primeArenaAudio, setArenaAudioEnabled } from './audio';
 import { useGameLoop } from './GameLoop';
 import { CANVAS_SIZE, COLORS, DIFFICULTY } from './constants';
-import { shareToTwitter } from './ShareCard';
-import { getWinRate, recordGame, type PlayerStats } from './PlayerStats';
+import { recordGame } from './PlayerStats';
 import type { Difficulty } from './types';
 
 interface GameCanvasProps {
@@ -20,23 +19,16 @@ interface GameCanvasProps {
 }
 
 const arenaViewportStyle = {
-    maxWidth: 'min(100%, 72dvh, 42rem)',
+    maxWidth: 'min(100%, 72dvh, 38rem)',
 };
 
 const difficultyOrder: Difficulty[] = ['EASY', 'MEDIUM', 'HARD', 'NIGHTMARE'];
-
-const toneClassName: Record<'neutral' | 'positive' | 'warning', string> = {
-    neutral: 'text-slate-200 border-white/10 bg-white/5',
-    positive: 'text-emerald-200 border-emerald-400/20 bg-emerald-400/10',
-    warning: 'text-amber-100 border-amber-300/20 bg-amber-300/10',
-};
 
 export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanvasProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const {
         score,
         timeRemaining,
-        streak,
         bestStreak,
         restart,
         togglePause,
@@ -47,15 +39,9 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
         isPaused,
         gameOver,
         rival,
-        feed,
-        momentum,
-        phase,
-        pingMs,
     } = useGameLoop(canvasRef, difficulty);
 
-    const [shareStatus, setShareStatus] = useState<'idle' | 'sharing' | 'shared' | 'copied' | 'downloaded'>('idle');
     const [hasRecordedGame, setHasRecordedGame] = useState(false);
-    const [stats, setStats] = useState<PlayerStats | null>(null);
     const [isPointerLocked, setIsPointerLocked] = useState(false);
     const [isCoarsePointer, setIsCoarsePointer] = useState(false);
     const [soundEnabled, setSoundEnabledState] = useState(() => isArenaAudioEnabled());
@@ -73,13 +59,6 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
     const easierDifficulty = difficultyOrder[difficultyIndex - 1];
     const suggestedDifficulty = playerWon ? harderDifficulty : easierDifficulty;
     const suggestedDifficultyLabel = suggestedDifficulty ? DIFFICULTY[suggestedDifficulty].label : null;
-    const rematchPrompt = playerWon
-        ? margin >= 14
-            ? 'You had the board under control. Push the room hotter.'
-            : 'That finish was close enough to want another one immediately.'
-        : bestStreak >= 4
-            ? 'You had a lane. One cleaner rally flips the result.'
-            : 'The board is still there. Take it back before the rhythm fades.';
 
     const formatTime = (seconds: number) => {
         const minutes = Math.floor(seconds / 60);
@@ -150,7 +129,7 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
     useEffect(() => {
         if (!gameOver || hasRecordedGame) return;
 
-        const nextStats = recordGame({
+        recordGame({
             result: playerWon ? 'win' : 'loss',
             territoryPercent: dayPercent,
             bestStreak,
@@ -158,22 +137,16 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
             difficulty,
             rivalAlias: rival.alias,
         });
-
-        setStats(nextStats);
         setHasRecordedGame(true);
     }, [bestStreak, dayPercent, difficulty, gameOver, hasRecordedGame, margin, playerWon, rival.alias]);
 
     const handleRestart = useCallback(() => {
         setHasRecordedGame(false);
-        setShareStatus('idle');
-        setStats(null);
         restart();
     }, [restart]);
 
     const handleDifficultyJump = useCallback((nextDifficulty: Difficulty) => {
         setHasRecordedGame(false);
-        setShareStatus('idle');
-        setStats(null);
 
         if (nextDifficulty === difficulty || !onChangeDifficulty) {
             restart();
@@ -182,18 +155,6 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
 
         onChangeDifficulty(nextDifficulty);
     }, [difficulty, onChangeDifficulty, restart]);
-
-    const handleShare = async () => {
-        setShareStatus('sharing');
-        const result = await shareToTwitter({
-            dayPercent,
-            difficulty,
-            playerWon,
-            rivalAlias: rival.alias,
-            bestStreak,
-        });
-        setShareStatus(result);
-    };
 
     const handleSoundToggle = useCallback(() => {
         const nextValue = !soundEnabled;
@@ -213,28 +174,7 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
         canvasRef.current?.requestPointerLock?.();
     }, [gameOver, isCoarsePointer, isPaused]);
 
-    const shareLabel = {
-        idle: 'Share the board',
-        sharing: 'Building card...',
-        shared: 'Posted',
-        copied: 'Copied card',
-        downloaded: 'Saved card',
-    }[shareStatus];
-    const liveFeed = feed[0];
-    const liveFeedText = liveFeed?.text ?? rival.signature;
-    const liveFeedToneClass = liveFeed ? toneClassName[liveFeed.tone] : toneClassName.neutral;
-    const pointerHint = isCoarsePointer
-        ? 'Drag anywhere on the board'
-        : isPointerLocked
-            ? 'Aim locked • Esc releases'
-            : 'Click board to lock aim';
-    const quickActionCopy = criticalActive
-        ? 'One clean touch flips it.'
-        : clutchActive
-            ? 'Cut shots matter now.'
-            : isCoarsePointer
-                ? 'Drag low. Carve lanes.'
-                : 'Clip the edge to carve lanes.';
+    const resultLine = `${dayPercent}% board · ${bestStreak}x peak · ${margin > 0 ? '+' : ''}${margin}% swing`;
 
     useEffect(() => {
         const handleHotkeys = (event: KeyboardEvent) => {
@@ -265,40 +205,25 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
     return (
         <div className="min-h-screen min-h-[100dvh] overflow-hidden bg-[var(--cp-bg)] text-[var(--cp-text)]">
             <div className="cp-arena-noise fixed inset-0 pointer-events-none" />
-            <div className="relative mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 py-4 sm:px-6 sm:py-6">
+            <div className="relative mx-auto flex min-h-screen w-full max-w-4xl flex-col px-4 py-4 sm:px-6 sm:py-5">
                 <main className="flex flex-1 items-center justify-center py-1 sm:py-2">
-                    <section className="w-full space-y-3" style={arenaViewportStyle}>
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex flex-wrap items-center gap-2">
+                    <section className="w-full space-y-1.5" style={arenaViewportStyle}>
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-2">
                                 {onBack && (
                                     <button
                                         onClick={onBack}
-                                        className="cp-chip min-h-[40px] rounded-full px-3.5 py-2 text-xs font-medium text-[var(--cp-muted)] transition hover:text-white"
+                                        className="cp-chip min-h-[38px] rounded-full px-3 py-1.5 text-[11px] font-medium text-[var(--cp-muted)] transition hover:text-white"
                                     >
                                         ← Exit
                                     </button>
                                 )}
-                                <div className="cp-chip rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.2em] text-white">
-                                    {rival.alias}
-                                </div>
-                                <div
-                                    className="rounded-full border px-3 py-2 text-[11px] font-bold uppercase tracking-[0.22em]"
-                                    style={{ borderColor: 'rgba(255, 111, 60, 0.25)', color: COLORS.dayAccent }}
-                                >
-                                    {difficultyMeta.label}
-                                </div>
-                                <div className="cp-chip rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-[var(--cp-muted)]">
-                                    {pingMs}ms
-                                </div>
-                                <button
-                                    onClick={handleSoundToggle}
-                                    className="cp-chip min-h-[40px] rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.22em] text-[var(--cp-muted)] transition hover:text-white"
-                                >
-                                    {soundEnabled ? 'Sound on' : 'Sound off'}
-                                </button>
+                                <p className="truncate text-[10px] uppercase tracking-[0.18em] text-[var(--cp-dim)] sm:text-[11px]">
+                                    {rival.alias} · {difficultyMeta.label}
+                                </p>
                             </div>
                             <div
-                                className={`cp-timer-pill cp-display rounded-full border border-white/10 px-3.5 py-2 text-lg sm:text-xl ${clutchActive ? 'cp-timer-pill-clutch' : ''} ${criticalActive ? 'cp-timer-pill-critical' : ''}`}
+                                className={`cp-timer-pill cp-display rounded-full border border-white/10 px-3 py-1.5 text-base sm:text-lg ${clutchActive ? 'cp-timer-pill-clutch' : ''} ${criticalActive ? 'cp-timer-pill-critical' : ''}`}
                                 style={{ color: timerColor }}
                             >
                                 {formatTime(timeRemaining)}
@@ -306,40 +231,29 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
                         </div>
 
                         <section
-                            className={`cp-panel cp-arena-stage p-2.5 sm:p-3 ${clutchActive ? 'cp-arena-stage-clutch' : ''} ${criticalActive ? 'cp-arena-stage-critical' : ''}`}
+                            className={`cp-panel cp-arena-stage p-2 sm:p-2.5 ${clutchActive ? 'cp-arena-stage-clutch' : ''} ${criticalActive ? 'cp-arena-stage-critical' : ''}`}
                         >
-                            <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                                <div className="min-w-0 flex-1">
-                                    <div className="mb-2 flex items-center justify-between font-mono text-[12px]">
+                            <div className="mb-1.5">
+                                <div className="mb-1 flex items-center justify-between text-[10px] uppercase tracking-[0.16em] sm:text-[11px]">
                                         <span style={{ color: COLORS.nightBall }}>{nightPercent}% rival</span>
-                                        <span className="text-[var(--cp-dim)]">territory</span>
                                         <span style={{ color: COLORS.dayAccent }}>{dayPercent}% you</span>
-                                    </div>
-                                    <div className="h-2.5 overflow-hidden rounded-full bg-black/40">
-                                        <div className="flex h-full">
-                                            <div style={{ width: `${nightPercent}%`, background: `linear-gradient(90deg, ${COLORS.night}, ${COLORS.nightAccent})` }} />
-                                            <div style={{ width: `${dayPercent}%`, background: `linear-gradient(90deg, ${COLORS.dayAccent}, ${COLORS.day})` }} />
-                                        </div>
-                                    </div>
                                 </div>
-
-                                <div className={`max-w-full rounded-full border px-3 py-2 text-[11px] uppercase tracking-[0.16em] ${liveFeedToneClass}`}>
-                                    {phase} · {quickActionCopy}
+                                <div className="h-2 overflow-hidden rounded-full bg-black/40">
+                                    <div className="flex h-full">
+                                        <div style={{ width: `${nightPercent}%`, background: `linear-gradient(90deg, ${COLORS.night}, ${COLORS.nightAccent})` }} />
+                                        <div style={{ width: `${dayPercent}%`, background: `linear-gradient(90deg, ${COLORS.dayAccent}, ${COLORS.day})` }} />
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-black/20 p-2 shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
+                            <div className="relative overflow-hidden rounded-[26px] border border-white/10 bg-black/18 p-1.5 shadow-[0_18px_46px_rgba(0,0,0,0.42)]">
                                 {clutchActive && !gameOver && (
-                                    <div className="pointer-events-none absolute inset-x-0 top-14 z-10 flex justify-center">
-                                        <div className={`cp-chip rounded-full px-4 py-2 text-[11px] uppercase tracking-[0.2em] ${criticalActive ? 'text-rose-100' : 'text-amber-100'}`}>
-                                            {criticalActive ? `Final ${timeRemaining}s` : 'Clutch'}
+                                    <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center">
+                                        <div className={`cp-chip rounded-full px-2.5 py-1 text-[9px] uppercase tracking-[0.18em] ${criticalActive ? 'text-rose-100' : 'text-amber-100'}`}>
+                                            {criticalActive ? `${timeRemaining}s left` : 'Clutch'}
                                         </div>
                                     </div>
                                 )}
-                                <div className="absolute inset-x-5 top-4 z-10 flex justify-between text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--cp-muted)]">
-                                    <span>Rival territory</span>
-                                    <span>Your territory</span>
-                                </div>
                                 <canvas
                                     ref={canvasRef}
                                     width={CANVAS_SIZE}
@@ -350,14 +264,6 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
                                     onTouchMove={handleTouchMove}
                                     onTouchStart={handleArenaTouchStart}
                                 />
-
-                                {!gameOver && (
-                                    <div className="pointer-events-none absolute inset-x-5 bottom-4 z-10 flex justify-center">
-                                        <div className="cp-chip rounded-full px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-[var(--cp-muted)]">
-                                            {pointerHint}
-                                        </div>
-                                    </div>
-                                )}
 
                                 {isPaused && !gameOver && (
                                     <div className="absolute inset-0 z-20 flex items-center justify-center rounded-[22px] bg-black/70 backdrop-blur">
@@ -371,86 +277,41 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
 
                                 {gameOver && (
                                     <div className="absolute inset-0 z-20 flex items-center justify-center rounded-[22px] bg-black/78 px-5 py-6 backdrop-blur-md">
-                                        <div className="w-full max-w-sm text-center">
+                                        <div className="w-full max-w-[18.5rem] text-center">
                                             <p className="cp-kicker">Match complete</p>
                                             <h2
-                                                className="cp-display mt-2 text-3xl font-black sm:text-4xl"
+                                                className="cp-display mt-2 text-[2rem] font-black sm:text-[2.35rem]"
                                                 style={{ color: playerWon ? COLORS.success : COLORS.nightBall }}
                                             >
                                                 {playerWon ? 'Arena secured' : 'Rival held firm'}
                                             </h2>
                                             <p className="mt-3 text-sm leading-relaxed text-[var(--cp-muted)]">
                                                 {playerWon
-                                                    ? `You finished with ${dayPercent}% against ${rival.alias}. Queue the next duel while the rhythm is hot.`
-                                                    : `${rival.alias} edged it ${nightPercent}% to ${dayPercent}%. Jump back in and take the board right away.`}
-                                            </p>
-                                            <p className="mt-3 text-[11px] uppercase tracking-[0.16em] text-[var(--cp-dim)]">
-                                                {rematchPrompt}
+                                                    ? `Held ${dayPercent}% against ${rival.alias}. Queue the next duel while the rhythm is still hot.`
+                                                    : `${rival.alias} finished ${nightPercent}% to ${dayPercent}%. Run it back before the read fades.`}
                                             </p>
 
-                                            <div className="mt-5 grid grid-cols-3 gap-2">
-                                                <div className="cp-stat-card">
-                                                    <span className="cp-stat-label">Margin</span>
-                                                    <strong className="cp-stat-value">{Math.abs(margin)}%</strong>
-                                                </div>
-                                                <div className="cp-stat-card">
-                                                    <span className="cp-stat-label">Peak streak</span>
-                                                    <strong className="cp-stat-value">{bestStreak}x</strong>
-                                                </div>
-                                                <div className="cp-stat-card">
-                                                    <span className="cp-stat-label">Rival</span>
-                                                    <strong className="cp-stat-value text-base">{rival.alias}</strong>
-                                                </div>
-                                            </div>
+                                            <p className="mt-4 text-[11px] uppercase tracking-[0.16em] text-[var(--cp-dim)]">
+                                                {resultLine}
+                                            </p>
 
-                                            {stats && (
-                                                <p className="mt-4 text-xs uppercase tracking-[0.18em] text-[var(--cp-dim)]">
-                                                    Career win rate {getWinRate(stats)}% · Best board {stats.bestScore}%
-                                                </p>
-                                            )}
-
-                                            <div className="mt-5 space-y-2.5">
+                                            <div className="mt-5 space-y-2">
                                                 <button
                                                     onClick={handleRestart}
                                                     className="btn-gradient w-full justify-center rounded-2xl px-5 py-3.5 text-base font-bold text-white"
                                                 >
                                                     Instant rematch
                                                 </button>
-                                                <div className="grid gap-2 sm:grid-cols-2">
-                                                    {suggestedDifficulty && suggestedDifficultyLabel ? (
-                                                        <button
-                                                            onClick={() => handleDifficultyJump(suggestedDifficulty)}
-                                                            className="cp-button-secondary w-full justify-center px-4 py-3 text-sm"
-                                                        >
-                                                            {playerWon ? `Raise heat · ${suggestedDifficultyLabel}` : `Reset lower · ${suggestedDifficultyLabel}`}
-                                                        </button>
-                                                    ) : onBack ? (
-                                                        <button
-                                                            onClick={onBack}
-                                                            className="cp-button-secondary w-full justify-center px-4 py-3 text-sm"
-                                                        >
-                                                            Exit arena
-                                                        </button>
-                                                    ) : (
-                                                        <button
-                                                            onClick={handleShare}
-                                                            disabled={shareStatus === 'sharing'}
-                                                            className="cp-button-secondary w-full justify-center px-4 py-3 text-sm disabled:cursor-wait disabled:opacity-70"
-                                                        >
-                                                            {shareLabel}
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        onClick={handleShare}
-                                                        disabled={shareStatus === 'sharing'}
-                                                        className="cp-button-secondary w-full justify-center px-4 py-3 text-sm disabled:cursor-wait disabled:opacity-70"
-                                                    >
-                                                        {shareLabel}
-                                                    </button>
-                                                </div>
-                                                <p className="text-center text-[11px] uppercase tracking-[0.16em] text-[var(--cp-dim)]">
-                                                    Enter rematch{suggestedDifficulty ? ' · Shift+Enter change heat' : ''}
-                                                </p>
+                                                <button
+                                                    onClick={suggestedDifficulty ? () => handleDifficultyJump(suggestedDifficulty) : onBack}
+                                                    className="cp-button-secondary w-full justify-center px-4 py-3 text-sm"
+                                                >
+                                                    {suggestedDifficulty && suggestedDifficultyLabel
+                                                        ? playerWon
+                                                            ? `Raise heat · ${suggestedDifficultyLabel}`
+                                                            : `Reset lower · ${suggestedDifficultyLabel}`
+                                                        : 'Back to home'}
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -458,39 +319,29 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
                             </div>
 
                             {!gameOver && (
-                                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                    <div className={`max-w-full truncate rounded-full border px-3 py-2 text-[11px] uppercase tracking-[0.14em] ${liveFeedToneClass}`}>
-                                        {liveFeedText}
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        <div className="cp-chip rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-[var(--cp-muted)]">
-                                            Streak {streak}x
-                                        </div>
-                                        <div className="cp-chip rounded-full px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-[var(--cp-muted)]">
-                                            Pulse {momentum}%
-                                        </div>
-                                        <button
-                                            onClick={togglePause}
-                                            disabled={gameOver}
-                                            className="cp-button-secondary !min-h-[40px] px-4 py-2 text-sm disabled:opacity-50"
-                                        >
-                                            {isPaused ? 'Resume' : 'Pause'}
-                                        </button>
-                                        <button onClick={handleRestart} className="cp-button-secondary !min-h-[40px] px-4 py-2 text-sm">
-                                            Reset
-                                        </button>
-                                    </div>
+                                <div className="mt-2 flex items-center justify-end gap-2">
+                                    <button
+                                        onClick={handleSoundToggle}
+                                        className="cp-button-secondary !min-h-[38px] px-3.5 py-2 text-[11px] uppercase tracking-[0.14em]"
+                                    >
+                                        {soundEnabled ? 'Sound on' : 'Sound off'}
+                                    </button>
+                                    <button
+                                        onClick={togglePause}
+                                        disabled={gameOver}
+                                        className="cp-button-secondary !min-h-[38px] px-3.5 py-2 text-[11px] uppercase tracking-[0.14em] disabled:opacity-50"
+                                    >
+                                        {isPaused ? 'Resume' : 'Pause'}
+                                    </button>
+                                    <button
+                                        onClick={handleRestart}
+                                        className="cp-button-secondary !min-h-[38px] px-3.5 py-2 text-[11px] uppercase tracking-[0.14em]"
+                                    >
+                                        Reset
+                                    </button>
                                 </div>
                             )}
                         </section>
-
-                        {gameOver && (
-                            <div className="flex flex-wrap items-center justify-center gap-2">
-                                <div className={`rounded-full border px-3 py-2 text-[11px] uppercase tracking-[0.16em] ${liveFeedToneClass}`}>
-                                    {liveFeedText}
-                                </div>
-                            </div>
-                        )}
                     </section>
                 </main>
             </div>
