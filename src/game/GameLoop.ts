@@ -16,6 +16,13 @@ import {
     BALL_RADIUS,
     BASE_ACCELERATION,
     CANVAS_SIZE,
+    CLUTCH_COMEBACK_DAMAGE_BONUS,
+    CLUTCH_COMEBACK_MARGIN,
+    CLUTCH_SWING_CAPTURE_BONUS,
+    CLUTCH_SWING_CUT_BONUS,
+    CLUTCH_SWING_DAMAGE_BONUS,
+    CLUTCH_SWING_SPEED_BONUS,
+    CLUTCH_SWING_WINDOW,
     COLORS,
     DIFFICULTY,
     GRID_HEIGHT,
@@ -590,9 +597,9 @@ export const useGameLoop = (
             lastCountdownCueRef.current = roundedRemaining;
             playClutchPulseSound(roundedRemaining);
 
-            if ([10, 5, 3, 1].includes(roundedRemaining)) {
+            if ([10, 8, 5, 3, 1].includes(roundedRemaining)) {
                 emitFloatingText(
-                    roundedRemaining === 10 ? 'Final 10' : `${roundedRemaining}`,
+                    roundedRemaining === 10 ? 'Final 10' : roundedRemaining === 8 ? 'Last swing' : `${roundedRemaining}`,
                     CANVAS_SIZE / 2,
                     CANVAS_SIZE * 0.28,
                     roundedRemaining <= 3 ? COLORS.danger : COLORS.warning,
@@ -726,6 +733,9 @@ export const useGameLoop = (
             owner === 'player'
             && timeCacheRef.current >= MATCH_DURATION - OPENING_HOOK_WINDOW
             && openingHookReturnsRef.current < OPENING_HOOK_MAX_RETURNS;
+        const clutchSwingActive = owner === 'player' && timeCacheRef.current <= CLUTCH_SWING_WINDOW;
+        const clutchDeficit = Math.max(0, state.nightScore - state.dayScore);
+        const comebackSwingActive = clutchSwingActive && clutchDeficit >= CLUTCH_COMEBACK_MARGIN;
         const edgeDirection = Math.sign(hitOffset) || Math.sign(paddle.velocity);
         const paddleInfluence = paddle.velocity * (0.08 + impactPower * 0.035 + edgePower * 0.02);
         const edgeSpinBoost = edgeDirection * edgePower * (PADDLE_EDGE_SPIN_BONUS + ball.captureCharge * 0.24 + impactPower * 0.9);
@@ -771,6 +781,29 @@ export const useGameLoop = (
                 );
             }
 
+            if (clutchSwingActive) {
+                ball.captureCharge = clamp(
+                    ball.captureCharge + CLUTCH_SWING_CAPTURE_BONUS + (comebackSwingActive ? 1 : 0),
+                    0,
+                    MAX_CAPTURE_CHARGE,
+                );
+                ball.cutCharge = clamp(
+                    ball.cutCharge + CLUTCH_SWING_CUT_BONUS + edgePower * 0.08 + (comebackSwingActive ? 0.1 : 0),
+                    0,
+                    BALL_CUT_CHARGE_MAX,
+                );
+
+                if (impactPower > 0.68) {
+                    emitFloatingText(
+                        comebackSwingActive ? 'Steal it' : 'Last push',
+                        ball.x,
+                        ball.y - 20,
+                        comebackSwingActive ? COLORS.success : COLORS.warning,
+                        14 + impactPower * 3,
+                    );
+                }
+            }
+
             if (edgePower > 0.54) {
                 ball.cutCharge = clamp(
                     ball.cutCharge + edgePower * PADDLE_EDGE_CUT_CHARGE + impactPower * 0.14 + streakOverdrive * 0.06,
@@ -808,6 +841,7 @@ export const useGameLoop = (
                 + edgeSpeedBonus
                 + overdriveSpeedBonus
                 + (openingHookActive ? OPENING_HOOK_SPEED_BONUS + impactPower * 0.22 : 0)
+                + (clutchSwingActive ? CLUTCH_SWING_SPEED_BONUS + (comebackSwingActive ? 0.18 : 0) : 0)
             : RIVAL_RETURN_BOOST + state.rival.aggression * 0.12 + impactPower * 0.34 + edgeSpeedBonus * 0.32;
 
         const targetSpeed = clamp(
@@ -901,7 +935,7 @@ export const useGameLoop = (
      * more of their charge so hot streaks visibly chew wider holes through the
      * enemy side instead of feeling like a subtle stat bonus.
      */
-    const detectTileCollision = (ball: Ball, ownership: Team[]) => {
+    const detectTileCollision = (state: GameState, ball: Ball, ownership: Team[]) => {
         const enemyTeam: Team = ball.team === 'day' ? 'night' : 'day';
         const streakOverdrive = ball.team === 'day' ? getStreakOverdrive(streakRef.current) : 0;
         const overdriveCaptureBonus = Math.floor(streakOverdrive / STREAK_OVERDRIVE_CAPTURE_STEP);
@@ -921,7 +955,16 @@ export const useGameLoop = (
         const openingDamageBonus = ball.team === 'day' && timeCacheRef.current >= MATCH_DURATION - OPENING_HOOK_WINDOW
             ? OPENING_HOOK_DAMAGE_BONUS
             : 0;
-        const destructionBonus = speedDamageBonus + streakDamageBonus + openingDamageBonus;
+        const clutchDamageBonus = ball.team === 'day' && timeCacheRef.current <= CLUTCH_SWING_WINDOW
+            ? CLUTCH_SWING_DAMAGE_BONUS
+            : 0;
+        const comebackDamageBonus =
+            ball.team === 'day'
+            && timeCacheRef.current <= CLUTCH_SWING_WINDOW
+            && state.nightScore - state.dayScore >= CLUTCH_COMEBACK_MARGIN
+                ? CLUTCH_COMEBACK_DAMAGE_BONUS
+                : 0;
+        const destructionBonus = speedDamageBonus + streakDamageBonus + openingDamageBonus + clutchDamageBonus + comebackDamageBonus;
         const centerCol = clamp(Math.floor(ball.x / TILE_SIZE), 0, GRID_WIDTH - 1);
         const centerRow = clamp(Math.floor(ball.y / TILE_SIZE), 0, GRID_HEIGHT - 1);
         const searchRadius = 1
@@ -1506,7 +1549,7 @@ export const useGameLoop = (
                 checkPaddleCollision(state, ball, state.aiPaddle, AI_PADDLE_Y, 1, 'rival');
             }
 
-            detectTileCollision(ball, state.ownership);
+            detectTileCollision(state, ball, state.ownership);
             checkBoundaries(state, ball);
             updateBallPhysics(ball, delta);
         }
