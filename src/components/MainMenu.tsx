@@ -40,7 +40,7 @@ export const MainMenu = ({ onStartGame }: MainMenuProps) => {
     return (
         <div className="relative min-h-screen min-h-[100dvh] overflow-hidden bg-[var(--cp-bg)] text-[var(--cp-text)]">
             <div className="cp-home-bg fixed inset-0 pointer-events-none" />
-            <div className="cp-home-shell relative mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 py-5 sm:px-6 sm:py-6">
+            <div className="cp-home-shell relative mx-auto flex min-h-screen w-full max-w-[66rem] flex-col px-4 py-4 sm:px-6 sm:py-6">
                 <header className="flex items-center justify-between gap-4">
                     <p className="cp-kicker">Combat Pong</p>
                     <a href="/controls" className="cp-home-utility-link">
@@ -48,19 +48,19 @@ export const MainMenu = ({ onStartGame }: MainMenuProps) => {
                     </a>
                 </header>
 
-                <main className="flex flex-1 items-center py-5 sm:py-7">
-                    <section className="grid w-full items-center gap-7 lg:grid-cols-[minmax(0,1fr)_minmax(18.5rem,0.82fr)]">
-                        <div className="max-w-[34rem]">
+                <main className="flex flex-1 items-center py-4 sm:py-6">
+                    <section className="grid w-full items-center gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(17.5rem,0.78fr)]">
+                        <div className="max-w-[31rem]">
                             <p className="cp-home-mini">Anonymous territory duel</p>
                             <h1 className="cp-display cp-home-title mt-3 text-white">Take the board.</h1>
                             <p className="cp-home-lede mt-4 max-w-[30rem] text-[var(--cp-muted)]">
-                                Hit clean, build speed, rip lanes open. The whole duel resolves in 90 seconds.
+                                Hit clean, build speed, rip lanes open. Ninety seconds decides the whole board.
                             </p>
 
                             <div className="mt-6 flex flex-wrap items-center gap-3">
                                 <button
                                     onClick={() => onStartGame(selectedDifficulty)}
-                                    className="btn-gradient rounded-2xl px-6 py-3.5 text-base font-bold text-white"
+                                    className="btn-gradient rounded-2xl px-5 py-3 text-base font-bold text-white"
                                 >
                                     Drop in · {selectedSettings.label}
                                 </button>
@@ -69,7 +69,7 @@ export const MainMenu = ({ onStartGame }: MainMenuProps) => {
                                 </a>
                             </div>
 
-                            <p className="cp-home-note mt-4">No account. No queue. Enter starts instantly.</p>
+                            <p className="cp-home-note mt-4">No account. Instant drop-in. Enter starts.</p>
 
                             <div className="mt-7 space-y-3">
                                 <div className="flex items-center justify-between gap-3">
@@ -106,25 +106,25 @@ export const MainMenu = ({ onStartGame }: MainMenuProps) => {
                             </div>
                         </div>
 
-                        <div className="lg:justify-self-end">
+                        <div className="mx-auto w-full max-w-[22.5rem] lg:max-w-none lg:justify-self-end">
                             <button
                                 type="button"
                                 onClick={() => onStartGame(selectedDifficulty)}
                                 className="cp-home-stage-button group w-full text-left"
                                 aria-label={`Start ${selectedSettings.label} duel`}
                             >
-                                <div className="cp-home-stage p-4 sm:p-5">
+                                <div className="cp-home-stage p-3.5 sm:p-4">
                                     <div className="cp-home-stage-topline">
                                         <span>{selectedSettings.label}</span>
-                                        <span>Click board to play</span>
+                                        <span>Start instantly</span>
                                     </div>
-                                <div className="cp-home-board">
-                                    <div className="cp-home-preview-paddle cp-home-preview-paddle-top" />
-                                    <div className="cp-home-preview-paddle cp-home-preview-paddle-bottom" />
-                                    <div className="cp-home-board-lane" />
-                                    <div className="cp-home-orb cp-home-orb-night" />
-                                    <div className="cp-home-orb cp-home-orb-day" />
-                                </div>
+                                    <div className="cp-home-board">
+                                        <div className="cp-home-preview-paddle cp-home-preview-paddle-top" />
+                                        <div className="cp-home-preview-paddle cp-home-preview-paddle-bottom" />
+                                        <div className="cp-home-board-lane" />
+                                        <div className="cp-home-orb cp-home-orb-night" />
+                                        <div className="cp-home-orb cp-home-orb-day" />
+                                    </div>
                                     <div className="cp-home-stage-footer mt-4">
                                         <p className="cp-home-stage-hint">{selectedSettings.subtitle}</p>
                                         <span className="cp-home-stage-cta">Drop in</span>

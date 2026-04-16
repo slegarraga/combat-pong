@@ -581,13 +581,72 @@ select {
 }
 
 @media (max-width: 900px) {
+  .cp-home-shell {
+    padding-block: 1rem 1.25rem;
+  }
+
   .cp-home-title {
-    max-width: 8ch;
+    font-size: clamp(2.65rem, 12vw, 4.15rem);
+    letter-spacing: -0.072em;
+    max-width: 6.1ch;
+  }
+
+  .cp-home-lede {
+    font-size: 0.96rem;
+    line-height: 1.58;
+    max-width: 28ch;
+  }
+
+  .cp-home-note {
+    font-size: 0.64rem;
+    letter-spacing: 0.16em;
+  }
+
+  .cp-home-stage {
+    border-radius: 1.45rem;
+  }
+
+  .cp-home-stage-topline {
+    margin-bottom: 0.72rem;
+    font-size: 0.62rem;
+  }
+
+  .cp-home-stage-note {
+    max-width: 28ch;
+    font-size: 0.84rem;
   }
 
   .cp-home-stage-footer {
     align-items: flex-start;
     flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .cp-home-stage-hint {
+    max-width: 24ch;
+  }
+
+  .cp-home-difficulty-pill {
+    min-height: 44px;
+    padding: 0.68rem 0.92rem;
+  }
+
+  .cp-home-utility-link {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 640px) {
+  .cp-home-board {
+    border-radius: 1.12rem;
+  }
+
+  .cp-home-preview-paddle {
+    height: 0.68rem;
+  }
+
+  .cp-home-stage-cta {
+    padding: 0.62rem 0.9rem;
   }
 }
 

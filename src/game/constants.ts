@@ -29,6 +29,13 @@ export const PADDLE_TARGET_BLEND = 0.42;
 export const PADDLE_MAX_TRAVEL_SPEED = 42;
 export const PADDLE_DAMPING = 0.86;
 export const PADDLE_POINTER_GAIN = 1.08;
+/**
+ * Touch drags intentionally move a little farther than the raw finger delta.
+ *
+ * That extra gain lets players steer from a comfortable thumb position instead
+ * of sitting directly on top of the paddle and hiding the read.
+ */
+export const PADDLE_TOUCH_GAIN = 1.14;
 export const PADDLE_IMPACT_REFERENCE_SPEED = 24;
 export const PADDLE_EDGE_WINDOW_START = 0.52;
 export const PADDLE_EDGE_WINDOW_RANGE = 0.4;

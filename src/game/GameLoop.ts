@@ -50,6 +50,7 @@ import {
     PADDLE_OFFSET,
     PADDLE_MAX_TRAVEL_SPEED,
     PADDLE_POINTER_GAIN,
+    PADDLE_TOUCH_GAIN,
     PADDLE_TARGET_BLEND,
     PADDLE_TARGET_RESPONSE,
     PADDLE_WIDTH,
@@ -151,6 +152,12 @@ interface BallImpactState {
     angle: number;
 }
 
+interface TouchControlState {
+    activeId: number;
+    startClientX: number;
+    startTargetX: number;
+}
+
 const PLAYER_PADDLE_Y = CANVAS_SIZE - PADDLE_OFFSET - PADDLE_HEIGHT;
 const AI_PADDLE_Y = PADDLE_OFFSET;
 
@@ -220,6 +227,7 @@ export const useGameLoop = (
         rival: { life: 0, intensity: 0, edgeBias: 0 },
     });
     const ballImpactRef = useRef<Record<string, BallImpactState>>({});
+    const touchControlRef = useRef<TouchControlState | null>(null);
     const shakeRef = useRef({ x: 0, y: 0, intensity: 0 });
     const gameOverRef = useRef(false);
     const startTimeRef = useRef(0);
@@ -1727,6 +1735,7 @@ export const useGameLoop = (
             rival: { life: 0, intensity: 0, edgeBias: 0 },
         };
         ballImpactRef.current = {};
+        touchControlRef.current = null;
         shakeRef.current = { x: 0, y: 0, intensity: 0 };
         gameOverRef.current = false;
         lastNarrationRef.current = 0;
@@ -1785,21 +1794,48 @@ export const useGameLoop = (
         if (!canvasRef.current || !stateRef.current || gameOverRef.current) return;
 
         event.preventDefault();
-        const rect = canvasRef.current.getBoundingClientRect();
-        const scaleX = CANVAS_SIZE / rect.width;
-        const targetX = (event.touches[0].clientX - rect.left) * scaleX - PADDLE_WIDTH / 2;
-        setPlayerPaddleTarget(targetX);
-    }, [canvasRef, setPlayerPaddleTarget]);
+        const touch = event.changedTouches[0] ?? event.touches[0];
+        if (!touch) return;
+
+        touchControlRef.current = {
+            activeId: touch.identifier,
+            startClientX: touch.clientX,
+            startTargetX: stateRef.current.playerPaddle.targetX,
+        };
+    }, [canvasRef]);
 
     const handleTouchMove = useCallback((event: React.TouchEvent<HTMLCanvasElement>) => {
         if (!canvasRef.current || !stateRef.current || gameOverRef.current) return;
 
         event.preventDefault();
+        const activeTouch = touchControlRef.current
+            ? Array.from(event.touches).find((touch) => touch.identifier === touchControlRef.current?.activeId)
+            : null;
+
+        if (!activeTouch || !touchControlRef.current || !canvasRef.current) return;
+
         const rect = canvasRef.current.getBoundingClientRect();
         const scaleX = CANVAS_SIZE / rect.width;
-        const targetX = (event.touches[0].clientX - rect.left) * scaleX - PADDLE_WIDTH / 2;
+        const dragDelta = (activeTouch.clientX - touchControlRef.current.startClientX) * scaleX;
+        const targetX = touchControlRef.current.startTargetX + dragDelta * PADDLE_TOUCH_GAIN;
         setPlayerPaddleTarget(targetX);
     }, [canvasRef, setPlayerPaddleTarget]);
+
+    const handleTouchEnd = useCallback((event: React.TouchEvent<HTMLCanvasElement>) => {
+        if (!touchControlRef.current) return;
+
+        const releasedTouch = Array.from(event.changedTouches).some(
+            (touch) => touch.identifier === touchControlRef.current?.activeId,
+        );
+
+        if (releasedTouch) {
+            touchControlRef.current = null;
+        }
+    }, []);
+
+    const handleTouchCancel = useCallback(() => {
+        touchControlRef.current = null;
+    }, []);
 
     const handlePointerDelta = useCallback((deltaX: number) => {
         if (!stateRef.current || gameOverRef.current) return;
@@ -1916,6 +1952,8 @@ export const useGameLoop = (
         handlePointerDelta,
         handleTouchStart,
         handleTouchMove,
+        handleTouchEnd,
+        handleTouchCancel,
         isPaused,
         gameOver,
         rival,
