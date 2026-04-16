@@ -74,7 +74,7 @@ export const MainMenu = ({ onStartGame }: MainMenuProps) => {
                             <div className="mt-7 space-y-3">
                                 <div className="flex items-center justify-between gap-3">
                                     <p className="cp-kicker">Pick the heat</p>
-                                    <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--cp-dim)]">
+                                    <span className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[var(--cp-muted)]">
                                         {selectedDifficulty === 'MEDIUM' ? 'Best first run' : selectedSettings.label}
                                     </span>
                                 </div>
@@ -93,7 +93,7 @@ export const MainMenu = ({ onStartGame }: MainMenuProps) => {
                                                 <span className="cp-display text-[0.98rem] font-bold text-white">
                                                     {settings.label}
                                                 </span>
-                                                <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--cp-dim)]">
+                                                <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--cp-muted)]">
                                                     {settings.ballPairs * 2} balls
                                                 </span>
                                             </button>

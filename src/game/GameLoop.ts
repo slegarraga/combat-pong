@@ -50,6 +50,10 @@ import {
     PADDLE_OFFSET,
     PADDLE_MAX_TRAVEL_SPEED,
     PADDLE_POINTER_GAIN,
+    PADDLE_RETURN_GRACE_BASE,
+    PADDLE_RETURN_GRACE_MAX,
+    PADDLE_RETURN_GRACE_STREAK_STEP,
+    PADDLE_RETURN_GRACE_VELOCITY_STEP,
     PADDLE_TOUCH_GAIN,
     PADDLE_TARGET_BLEND,
     PADDLE_TARGET_RESPONSE,
@@ -752,14 +756,24 @@ export const useGameLoop = (
         narrate(getRivalFeedLine(state.rival, 'reset'), 'warning', 0);
     };
 
+    const getPlayerReturnGrace = (paddle: Paddle) =>
+        clamp(
+            PADDLE_RETURN_GRACE_BASE
+                + Math.abs(paddle.velocity) * PADDLE_RETURN_GRACE_VELOCITY_STEP
+                + streakRef.current * PADDLE_RETURN_GRACE_STREAK_STEP,
+            PADDLE_RETURN_GRACE_BASE,
+            PADDLE_RETURN_GRACE_MAX,
+        );
+
     const applyPaddleReturn = (
         state: GameState,
         ball: Ball,
         paddle: Paddle,
         bounceDirection: number,
         owner: 'player' | 'rival',
+        assisted = false,
     ) => {
-        const hitOffset = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+        const hitOffset = clamp((ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2), -1, 1);
         const edgeBias = Math.abs(hitOffset);
         const streakOverdrive = owner === 'player' ? getStreakOverdrive(streakRef.current) : 0;
         const edgePower = owner === 'player'
@@ -781,6 +795,17 @@ export const useGameLoop = (
 
         if (owner === 'player') {
             awardPlayerStreak(state, ball);
+
+            if (assisted) {
+                emitFloatingText(
+                    streakOverdrive > 0 ? 'Clutch save' : 'Late save',
+                    ball.x,
+                    ball.y - 28,
+                    COLORS.dayBall,
+                    13 + streakOverdrive * 1.2,
+                );
+            }
+
             if (impactPower > 0.82) {
                 const heavyHitBonus = impactPower > 1.06 ? 2 : 1;
                 ball.captureCharge = clamp(
@@ -875,6 +900,7 @@ export const useGameLoop = (
                 + Math.abs(hitOffset) * 0.54
                 + ball.captureCharge * 0.16
                 + impactPower * 1.08
+                + (assisted ? 0.22 : 0)
                 + edgeSpeedBonus
                 + overdriveSpeedBonus
                 + (openingHookActive ? OPENING_HOOK_SPEED_BONUS + impactPower * 0.22 : 0)
@@ -896,7 +922,10 @@ export const useGameLoop = (
 
         const effectColor = ball.team === 'day' ? COLORS.dayAccent : COLORS.nightAccent;
         const expressiveImpact = clamp(
-            impactPower + edgePower * PADDLE_EDGE_IMPACT_BONUS + streakOverdrive * STREAK_OVERDRIVE_IMPACT_STEP,
+            impactPower
+                + edgePower * PADDLE_EDGE_IMPACT_BONUS
+                + streakOverdrive * STREAK_OVERDRIVE_IMPACT_STEP
+                + (assisted ? 0.12 : 0),
             0,
             1.72,
         );
@@ -945,19 +974,38 @@ export const useGameLoop = (
         const ballLeft = ball.x - BALL_RADIUS;
         const ballRight = ball.x + BALL_RADIUS;
 
-        const hit =
+        const directHit =
             ballRight > paddle.x &&
             ballLeft < paddle.x + paddle.width &&
             ballBottom > paddleY &&
             ballTop < paddleY + paddle.height;
+        const returnGrace = owner === 'player' ? getPlayerReturnGrace(paddle) : 0;
+        const assistedHit =
+            owner === 'player'
+            && !directHit
+            && ballRight > paddle.x - returnGrace
+            && ballLeft < paddle.x + paddle.width + returnGrace
+            && ballBottom > paddleY - 2
+            && ballTop < paddleY + paddle.height + 2;
+        const hit = directHit || assistedHit;
 
         if (!hit) return false;
+
+        if (assistedHit) {
+            const assistDirection = ball.x < paddle.x
+                ? -1
+                : ball.x > paddle.x + paddle.width
+                    ? 1
+                    : Math.sign(ball.vx || paddle.velocity || 1);
+
+            ball.x = paddle.x + paddle.width / 2 + assistDirection * paddle.width * 0.44;
+        }
 
         ball.y = owner === 'player'
             ? paddleY - BALL_RADIUS - 1
             : paddleY + paddle.height + BALL_RADIUS + 1;
 
-        applyPaddleReturn(state, ball, paddle, bounceDirection, owner);
+        applyPaddleReturn(state, ball, paddle, bounceDirection, owner, assistedHit);
         return true;
     };
 

@@ -208,8 +208,9 @@ select {
 
 .cp-kicker {
   margin: 0;
-  font-size: 0.74rem;
-  letter-spacing: 0.24em;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.21em;
   text-transform: uppercase;
   color: var(--cp-muted);
 }
@@ -246,10 +247,11 @@ select {
 }
 
 .cp-home-mini {
-  font-size: 0.72rem;
-  letter-spacing: 0.22em;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--cp-dim);
+  color: var(--cp-muted);
 }
 
 .cp-home-stage {
@@ -297,10 +299,11 @@ select {
   justify-content: space-between;
   gap: 0.75rem;
   margin-bottom: 0.85rem;
-  font-size: 0.68rem;
-  letter-spacing: 0.18em;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--cp-dim);
+  color: var(--cp-muted);
 }
 
 .cp-home-board {
@@ -409,10 +412,11 @@ select {
 }
 
 .cp-home-note {
-  font-size: 0.72rem;
-  letter-spacing: 0.18em;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--cp-dim);
+  color: var(--cp-muted);
 }
 
 .cp-home-difficulty-rail {
@@ -453,8 +457,8 @@ select {
 .cp-home-stage-note {
   position: relative;
   max-width: 30ch;
-  font-size: 0.9rem;
-  line-height: 1.65;
+  font-size: 0.95rem;
+  line-height: 1.68;
   color: var(--cp-muted);
 }
 
@@ -469,8 +473,8 @@ select {
 
 .cp-home-stage-hint {
   max-width: 18ch;
-  font-size: 0.88rem;
-  line-height: 1.6;
+  font-size: 0.93rem;
+  line-height: 1.62;
   color: var(--cp-muted);
 }
 
@@ -481,8 +485,9 @@ select {
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.04);
   padding: 0.7rem 1rem;
-  font-size: 0.68rem;
-  letter-spacing: 0.18em;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--cp-text);
 }
@@ -492,7 +497,8 @@ select {
   min-height: 40px;
   align-items: center;
   color: var(--cp-muted);
-  font-size: 0.84rem;
+  font-size: 0.92rem;
+  font-weight: 600;
   text-decoration: none;
   transition: color 0.16s ease, transform 0.16s ease;
 }
@@ -641,8 +647,8 @@ select {
   }
 
   .cp-home-note {
-    font-size: 0.64rem;
-    letter-spacing: 0.16em;
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
   }
 
   .cp-home-stage {
@@ -651,12 +657,12 @@ select {
 
   .cp-home-stage-topline {
     margin-bottom: 0.72rem;
-    font-size: 0.62rem;
+    font-size: 0.7rem;
   }
 
   .cp-home-stage-note {
     max-width: 28ch;
-    font-size: 0.84rem;
+    font-size: 0.9rem;
   }
 
   .cp-home-stage-footer {

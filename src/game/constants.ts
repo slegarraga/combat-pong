@@ -37,6 +37,17 @@ export const PADDLE_POINTER_GAIN = 1.08;
  */
 export const PADDLE_TOUCH_GAIN = 1.14;
 export const PADDLE_IMPACT_REFERENCE_SPEED = 24;
+/**
+ * Clean late saves should still feel possible when the player is moving with intent.
+ *
+ * The game is more satisfying when near-edge reads turn into dramatic returns
+ * instead of cheap-looking whiffs, so the player paddle gets a modest dynamic
+ * catch window that grows with velocity and streak.
+ */
+export const PADDLE_RETURN_GRACE_BASE = 8;
+export const PADDLE_RETURN_GRACE_VELOCITY_STEP = 0.2;
+export const PADDLE_RETURN_GRACE_STREAK_STEP = 1.1;
+export const PADDLE_RETURN_GRACE_MAX = 24;
 export const PADDLE_EDGE_WINDOW_START = 0.52;
 export const PADDLE_EDGE_WINDOW_RANGE = 0.4;
 export const PADDLE_EDGE_SPIN_BONUS = 3.2;

@@ -238,12 +238,12 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
                                 {onBack && (
                                     <button
                                         onClick={onBack}
-                                        className="cp-chip min-h-[40px] rounded-full px-3 py-1.5 text-[11px] font-medium text-[var(--cp-muted)] transition hover:text-white"
+                                        className="cp-chip min-h-[40px] rounded-full px-3 py-1.5 text-[12px] font-semibold text-[var(--cp-muted)] transition hover:text-white"
                                     >
                                         {exitLabel}
                                     </button>
                                 )}
-                                <p className="truncate text-[9px] uppercase tracking-[0.18em] text-[var(--cp-muted)] sm:text-[11px]">
+                                <p className="truncate text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--cp-muted)] sm:text-[12px]">
                                     {arenaMetaLine}
                                 </p>
                             </div>
@@ -260,11 +260,11 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
                         >
                             <div className="mb-1.5">
                                 {!isCoarsePointer && (
-                                    <p className="mb-1 text-[9px] uppercase tracking-[0.16em] text-[var(--cp-muted)]">
+                                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--cp-muted)]">
                                         {difficultyMeta.label}
                                     </p>
                                 )}
-                                <div className="mb-1 flex items-center justify-between text-[9px] uppercase tracking-[0.16em] sm:text-[11px]">
+                                <div className="mb-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.14em] sm:text-[11px]">
                                         <span style={{ color: COLORS.nightBall }}>{nightPercent}% rival</span>
                                         <span style={{ color: COLORS.dayAccent }}>{dayPercent}% you</span>
                                 </div>
@@ -279,7 +279,7 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
                             <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-black/18 p-1 shadow-[0_18px_46px_rgba(0,0,0,0.42)] sm:p-1.5">
                                 {clutchActive && !gameOver && (
                                     <div className="pointer-events-none absolute inset-x-0 top-2.5 z-10 flex justify-center">
-                                        <div className={`cp-chip rounded-full px-2 py-1 text-[8px] uppercase tracking-[0.18em] sm:px-2.5 sm:text-[9px] ${criticalActive ? 'text-rose-100' : 'text-amber-100'}`}>
+                                        <div className={`cp-chip rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${criticalActive ? 'text-rose-100' : 'text-amber-100'}`}>
                                             {criticalActive ? `${timeRemaining}s left` : 'Clutch'}
                                         </div>
                                     </div>
@@ -330,13 +330,13 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
                                             >
                                                 {playerWon ? 'Arena secured' : 'Rival held firm'}
                                             </h2>
-                                            <p className="cp-overlay-copy mt-3 text-[0.92rem] leading-relaxed">
+                                            <p className="cp-overlay-copy mt-3 text-[0.98rem] leading-relaxed">
                                                 {playerWon
                                                     ? `Held ${dayPercent}% against ${rival.alias}. Stay in rhythm.`
                                                     : `${rival.alias} closed ${nightPercent}% to ${dayPercent}. Run it back now.`}
                                             </p>
 
-                                            <p className="cp-overlay-meta mt-4 text-[11px] uppercase tracking-[0.16em]">
+                                            <p className="cp-overlay-meta mt-4 text-[12px] font-semibold uppercase tracking-[0.14em]">
                                                 {resultLine}
                                             </p>
 
@@ -360,7 +360,7 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
                                                     {secondaryActionLabel}
                                                 </button>
                                             </div>
-                                            <p className="cp-overlay-hint mt-4 text-[10px] uppercase tracking-[0.16em]">
+                                            <p className="cp-overlay-hint mt-4 text-[11px] font-semibold uppercase tracking-[0.14em]">
                                                 {postMatchHint}
                                             </p>
                                         </div>
@@ -372,20 +372,20 @@ export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanva
                                 <div className={`mt-2 flex gap-2 ${isCoarsePointer ? 'flex-wrap' : 'items-center justify-end'}`}>
                                     <button
                                         onClick={handleSoundToggle}
-                                        className={`cp-button-secondary min-h-[44px] px-3 py-2.5 text-[10px] uppercase tracking-[0.14em] sm:px-3.5 sm:text-[11px] ${isCoarsePointer ? 'flex-1 justify-center' : ''}`}
+                                        className={`cp-button-secondary min-h-[44px] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] sm:px-3.5 sm:text-[12px] ${isCoarsePointer ? 'flex-1 justify-center' : ''}`}
                                     >
                                         {soundEnabled ? 'Sound on' : 'Sound off'}
                                     </button>
                                     <button
                                         onClick={togglePause}
                                         disabled={gameOver}
-                                        className={`cp-button-secondary min-h-[44px] px-3 py-2.5 text-[10px] uppercase tracking-[0.14em] disabled:opacity-50 sm:px-3.5 sm:text-[11px] ${isCoarsePointer ? 'flex-1 justify-center' : ''}`}
+                                        className={`cp-button-secondary min-h-[44px] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] disabled:opacity-50 sm:px-3.5 sm:text-[12px] ${isCoarsePointer ? 'flex-1 justify-center' : ''}`}
                                     >
                                         {isPaused ? 'Resume' : 'Pause'}
                                     </button>
                                     <button
                                         onClick={handleRestart}
-                                        className={`cp-button-secondary min-h-[44px] px-3 py-2.5 text-[10px] uppercase tracking-[0.14em] sm:px-3.5 sm:text-[11px] ${isCoarsePointer ? 'w-full justify-center' : ''}`}
+                                        className={`cp-button-secondary min-h-[44px] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] sm:px-3.5 sm:text-[12px] ${isCoarsePointer ? 'w-full justify-center' : ''}`}
                                     >
                                         Reset
                                     </button>
