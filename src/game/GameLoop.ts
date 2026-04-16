@@ -109,6 +109,29 @@ interface BoardSlash {
     intensity: number;
 }
 
+interface ImpactFlash {
+    x: number;
+    y: number;
+    angle: number;
+    length: number;
+    width: number;
+    life: number;
+    color: string;
+    intensity: number;
+}
+
+interface PaddleImpactState {
+    life: number;
+    intensity: number;
+    edgeBias: number;
+}
+
+interface BallImpactState {
+    life: number;
+    intensity: number;
+    angle: number;
+}
+
 const PLAYER_PADDLE_Y = CANVAS_SIZE - PADDLE_OFFSET - PADDLE_HEIGHT;
 const AI_PADDLE_Y = PADDLE_OFFSET;
 
@@ -171,6 +194,12 @@ export const useGameLoop = (
     const floatingTextsRef = useRef<FloatingText[]>([]);
     const boardPulsesRef = useRef<BoardPulse[]>([]);
     const boardSlashesRef = useRef<BoardSlash[]>([]);
+    const impactFlashesRef = useRef<ImpactFlash[]>([]);
+    const paddleImpactRef = useRef<Record<'player' | 'rival', PaddleImpactState>>({
+        player: { life: 0, intensity: 0, edgeBias: 0 },
+        rival: { life: 0, intensity: 0, edgeBias: 0 },
+    });
+    const ballImpactRef = useRef<Record<string, BallImpactState>>({});
     const shakeRef = useRef({ x: 0, y: 0, intensity: 0 });
     const gameOverRef = useRef(false);
     const startTimeRef = useRef(0);
@@ -309,6 +338,55 @@ export const useGameLoop = (
         });
     };
 
+    const emitImpactFlash = (
+        x: number,
+        y: number,
+        angle: number,
+        color: string,
+        length = BALL_RADIUS * 5.6,
+        width = BALL_RADIUS * 0.6,
+        intensity = 1,
+    ) => {
+        impactFlashesRef.current.push({
+            x,
+            y,
+            angle,
+            color,
+            length,
+            width,
+            life: 1,
+            intensity,
+        });
+    };
+
+    const triggerContactSnap = (
+        ball: Ball,
+        owner: 'player' | 'rival',
+        impactPower: number,
+        edgeBias: number,
+        color: string,
+    ) => {
+        const angle = Math.atan2(ball.vy, ball.vx);
+        const ownerMultiplier = owner === 'player' ? 1 : 0.72;
+        const intensity = clamp((0.5 + impactPower * 0.62 + Math.abs(edgeBias) * 0.14) * ownerMultiplier, 0.28, 1.55);
+
+        paddleImpactRef.current[owner] = {
+            life: 1,
+            intensity,
+            edgeBias,
+        };
+
+        ballImpactRef.current[ball.id] = {
+            life: 1,
+            intensity,
+            angle,
+        };
+
+        emitImpactFlash(ball.x, ball.y, angle + Math.PI, color, BALL_RADIUS * (5.8 + intensity * 2.4), BALL_RADIUS * (0.5 + intensity * 0.18), intensity);
+        emitImpactFlash(ball.x, ball.y, angle + Math.PI * 0.5, color, BALL_RADIUS * (2.8 + intensity * 1.1), BALL_RADIUS * 0.24, intensity * 0.74);
+        emitImpactFlash(ball.x, ball.y, angle - Math.PI * 0.5, color, BALL_RADIUS * (2.8 + intensity * 1.1), BALL_RADIUS * 0.24, intensity * 0.74);
+    };
+
     const initOwnership = (): Team[] => {
         const ownership: Team[] = [];
         for (let index = 0; index < GRID_WIDTH * GRID_HEIGHT; index += 1) {
@@ -410,6 +488,35 @@ export const useGameLoop = (
                 boardSlashesRef.current.splice(index, 1);
             }
         }
+
+        for (let index = impactFlashesRef.current.length - 1; index >= 0; index -= 1) {
+            const flash = impactFlashesRef.current[index];
+            flash.length += (1.6 + flash.intensity * 1.4) * delta;
+            flash.life -= (0.09 + flash.intensity * 0.01) * delta;
+
+            if (flash.life <= 0) {
+                impactFlashesRef.current.splice(index, 1);
+            }
+        }
+
+        for (const owner of ['player', 'rival'] as const) {
+            const impact = paddleImpactRef.current[owner];
+            impact.life = Math.max(0, impact.life - (0.13 + impact.intensity * 0.012) * delta);
+            impact.intensity *= Math.pow(0.92, delta);
+        }
+
+        const nextBallStates: Record<string, BallImpactState> = {};
+        for (const [ballId, impact] of Object.entries(ballImpactRef.current)) {
+            const nextLife = impact.life - (0.12 + impact.intensity * 0.014) * delta;
+            if (nextLife <= 0) continue;
+
+            nextBallStates[ballId] = {
+                ...impact,
+                life: nextLife,
+                intensity: impact.intensity * Math.pow(0.925, delta),
+            };
+        }
+        ballImpactRef.current = nextBallStates;
     };
 
     const updateShake = () => {
@@ -680,6 +787,7 @@ export const useGameLoop = (
             0,
             1.72,
         );
+        triggerContactSnap(ball, owner, expressiveImpact, hitOffset, effectColor);
         const impactBurst = Math.round(expressiveImpact * 6 + edgePower * 4);
         triggerShake(
             owner === 'player'
@@ -1083,6 +1191,36 @@ export const useGameLoop = (
 
         ctx.save();
         ctx.globalCompositeOperation = 'screen';
+        ctx.lineCap = 'round';
+        for (const flash of impactFlashesRef.current) {
+            const directionX = Math.cos(flash.angle);
+            const directionY = Math.sin(flash.angle);
+            const startX = flash.x - directionX * flash.length * 0.18;
+            const startY = flash.y - directionY * flash.length * 0.18;
+            const endX = flash.x + directionX * flash.length * (0.84 + flash.intensity * 0.08);
+            const endY = flash.y + directionY * flash.length * (0.84 + flash.intensity * 0.08);
+
+            ctx.globalAlpha = clamp(flash.life * (0.3 + flash.intensity * 0.24), 0, 1);
+            ctx.strokeStyle = flash.color;
+            ctx.lineWidth = flash.width * (1 + (1 - flash.life) * 0.34);
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+
+            ctx.globalAlpha = clamp(flash.life * (0.18 + flash.intensity * 0.12), 0, 1);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
+            ctx.lineWidth = flash.width * 0.34;
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+        }
+        ctx.restore();
+        ctx.globalAlpha = 1;
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
         for (const pulse of boardPulsesRef.current) {
             const pulseGradient = ctx.createRadialGradient(
                 pulse.x,
@@ -1177,18 +1315,8 @@ export const useGameLoop = (
 
         renderPaddleTrail(ctx, state.playerPaddle, PLAYER_PADDLE_Y, COLORS.dayAccent);
         renderPaddleTrail(ctx, state.aiPaddle, AI_PADDLE_Y, COLORS.nightAccent);
-
-        ctx.shadowBlur = 20 + clamp(Math.abs(state.playerPaddle.velocity) * 0.55, 0, 16);
-        ctx.shadowColor = COLORS.dayAccent;
-        ctx.fillStyle = COLORS.paddle;
-        maybeRoundRect(ctx, state.playerPaddle.x, PLAYER_PADDLE_Y, state.playerPaddle.width, state.playerPaddle.height, 8);
-        ctx.fill();
-
-        ctx.shadowBlur = 18 + clamp(Math.abs(state.aiPaddle.velocity) * 0.38, 0, 10);
-        ctx.shadowColor = COLORS.nightAccent;
-        maybeRoundRect(ctx, state.aiPaddle.x, AI_PADDLE_Y, state.aiPaddle.width, state.aiPaddle.height, 8);
-        ctx.fill();
-        ctx.shadowBlur = 0;
+        renderPaddleBody(ctx, state.playerPaddle, PLAYER_PADDLE_Y, COLORS.dayAccent, paddleImpactRef.current.player);
+        renderPaddleBody(ctx, state.aiPaddle, AI_PADDLE_Y, COLORS.nightAccent, paddleImpactRef.current.rival);
 
         for (const ball of state.balls) {
             const ballColor = ball.team === 'day' ? COLORS.dayBall : COLORS.nightBall;
@@ -1234,11 +1362,30 @@ export const useGameLoop = (
                 ctx.stroke();
             }
 
+            const ballImpact = ballImpactRef.current[ball.id];
+            const impactStretch = ballImpact ? ballImpact.life * ballImpact.intensity : 0;
+            const renderAngle = ballImpact?.angle ?? Math.atan2(ball.vy, ball.vx);
             ctx.globalAlpha = 1;
             ctx.fillStyle = ballColor;
+            ctx.save();
+            ctx.translate(ball.x, ball.y);
+            ctx.rotate(renderAngle);
+            ctx.scale(
+                1 + impactStretch * 0.26,
+                1 - Math.min(0.24, impactStretch * 0.18),
+            );
             ctx.beginPath();
-            ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI * 2);
+            ctx.arc(0, 0, BALL_RADIUS, 0, Math.PI * 2);
             ctx.fill();
+
+            if (impactStretch > 0.08) {
+                ctx.globalAlpha = clamp(impactStretch * 0.3, 0, 0.5);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.beginPath();
+                ctx.ellipse(-BALL_RADIUS * 0.2, 0, BALL_RADIUS * 0.54, BALL_RADIUS * 0.32, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
         }
 
         ctx.restore();
@@ -1346,6 +1493,12 @@ export const useGameLoop = (
         floatingTextsRef.current = [];
         boardPulsesRef.current = [];
         boardSlashesRef.current = [];
+        impactFlashesRef.current = [];
+        paddleImpactRef.current = {
+            player: { life: 0, intensity: 0, edgeBias: 0 },
+            rival: { life: 0, intensity: 0, edgeBias: 0 },
+        };
+        ballImpactRef.current = {};
         shakeRef.current = { x: 0, y: 0, intensity: 0 };
         gameOverRef.current = false;
         lastNarrationRef.current = 0;
@@ -1450,6 +1603,39 @@ export const useGameLoop = (
         }
 
         ctx.globalAlpha = 1;
+    };
+
+    const renderPaddleBody = (
+        ctx: CanvasRenderingContext2D,
+        paddle: Paddle,
+        y: number,
+        glowColor: string,
+        impact: PaddleImpactState,
+    ) => {
+        const impactStretch = impact.life * impact.intensity;
+        const centerX = paddle.x + paddle.width / 2 + impact.edgeBias * impactStretch * 4;
+        const centerY = y + paddle.height / 2;
+        const widthScale = 1 + impactStretch * 0.18;
+        const heightScale = 1 - Math.min(0.28, impactStretch * 0.2);
+        const glowBoost = clamp(impactStretch * 14, 0, 14);
+
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.scale(widthScale, heightScale);
+        ctx.shadowBlur = 18 + clamp(Math.abs(paddle.velocity) * 0.42, 0, 12) + glowBoost;
+        ctx.shadowColor = glowColor;
+        ctx.fillStyle = COLORS.paddle;
+        maybeRoundRect(ctx, -paddle.width / 2, -paddle.height / 2, paddle.width, paddle.height, 8);
+        ctx.fill();
+
+        if (impactStretch > 0.08) {
+            ctx.globalAlpha = clamp(impactStretch * 0.22, 0, 0.34);
+            ctx.fillStyle = hexToRgba(glowColor, 0.95);
+            maybeRoundRect(ctx, -paddle.width / 2, -paddle.height / 2, paddle.width, paddle.height, 8);
+            ctx.fill();
+        }
+        ctx.restore();
+        ctx.shadowBlur = 0;
     };
 
     const restart = useCallback(() => {
