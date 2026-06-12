@@ -12,7 +12,8 @@ import { BOARD_SIZE, MATCH_DURATION, POINTER_LOCK_SENSITIVITY, type ModeId } fro
 import { advance, createEngine, dayShare, setPlayerTarget, softResume } from './engine';
 import { createRenderer, type Renderer } from './render';
 import {
-    isSoundEnabled, playCapture, playEnd, playMiss, playPaddle, playWall,
+    isSoundEnabled, playCapture, playEnd, playMiss, playPaddle,
+    playPowerUpCollect, playPowerUpSpawn, playWall,
     setSoundEnabled, startEndgameDrone, stopEndgameDrone, unlockAudio,
 } from './audio';
 import { getStats, recordMatch } from './PlayerStats';
@@ -152,6 +153,8 @@ const GameCanvas = ({ mode, daily, onHome }: GameCanvasProps) => {
                             playPaddle(e.side, e.streak, own, e.x, e.speed, e.slam);
                         } else if (e.type === 'miss') playMiss(e.side, e.x);
                         else if (e.type === 'wall') playWall(e.x);
+                        else if (e.type === 'powerup-spawn') playPowerUpSpawn(e.x);
+                        else if (e.type === 'powerup') playPowerUpCollect(e.kind, e.x);
                         else if (e.type === 'over') {
                             droneOn = false;
                             const final: MatchResult = {

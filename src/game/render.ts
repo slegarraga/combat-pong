@@ -8,7 +8,7 @@
 
 import {
     BOARD_SIZE, TILE_SIZE, GRID, BALL_RADIUS,
-    PADDLE_HEIGHT, PADDLE_MARGIN, COLORS,
+    PADDLE_HEIGHT, PADDLE_MARGIN, POWERUP_TTL, COLORS,
 } from './constants';
 import type { Ball, EngineEvent, EngineState, Team } from './types';
 
@@ -119,6 +119,11 @@ export const createRenderer = (canvas: HTMLCanvasElement): Renderer => {
                 });
             } else if (e.type === 'miss' && e.side === 'player') {
                 spawnParticles(e.x, BOARD_SIZE - 6, 'rgba(190,160,130,0.8)', 6, 60);
+            } else if (e.type === 'powerup') {
+                // Claiming a gift is the biggest moment on the board.
+                spawnParticles(e.x, e.y, COLORS.dayBallCore, 18, 220);
+                ripples.push({ x: e.x, y: e.y, t: 0, maxRadius: 70, color: COLORS.dayBall });
+                ripples.push({ x: e.x, y: e.y, t: -0.08, maxRadius: 96, color: COLORS.dayBallCore });
             }
         }
     };
@@ -233,6 +238,54 @@ export const createRenderer = (canvas: HTMLCanvasElement): Renderer => {
         ctx.restore();
     };
 
+    /**
+     * The gift: an amber glyph breathing inside its night tile. Burst is a
+     * dot in a ring, wide is a bar, wave is three lines (a whole row).
+     * It fades in, pulses gently, and fades out as its time runs down.
+     */
+    const drawPowerUp = (state: EngineState) => {
+        const gift = state.powerUp;
+        if (!gift) return;
+        const cx = gift.col * TILE_SIZE + TILE_SIZE / 2;
+        const cy = gift.row * TILE_SIZE + TILE_SIZE / 2;
+        const fadeIn = Math.min(gift.age / 0.4, 1);
+        const fadeOut = Math.min((POWERUP_TTL - gift.age) / 1.2, 1);
+        const pulse = 0.85 + 0.15 * Math.sin(gift.age * 4);
+        const alpha = fadeIn * fadeOut;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.globalAlpha = alpha * 0.16;
+        ctx.fillStyle = COLORS.day;
+        ctx.fillRect(-TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE);
+
+        ctx.globalAlpha = alpha;
+        ctx.scale(pulse, pulse);
+        ctx.strokeStyle = COLORS.dayBall;
+        ctx.fillStyle = COLORS.dayBall;
+        ctx.lineWidth = 1.8;
+        ctx.shadowColor = COLORS.dayBall;
+        ctx.shadowBlur = 12;
+        if (gift.kind === 'burst') {
+            ctx.beginPath();
+            ctx.arc(0, 0, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(0, 0, 8, 0, Math.PI * 2);
+            ctx.stroke();
+        } else if (gift.kind === 'wide') {
+            roundRect(ctx, -8, -2.5, 16, 5, 2.5);
+            ctx.fill();
+        } else {
+            for (const dy of [-6, 0, 6]) {
+                roundRect(ctx, -8, dy - 1.5, 16, 3, 1.5);
+                ctx.fill();
+            }
+        }
+        ctx.restore();
+        ctx.globalAlpha = 1;
+    };
+
     const drawPaddle = (x: number, y: number, width: number, stretch: number, color: string, glow: string) => {
         ctx.save();
         ctx.translate(x, y + PADDLE_HEIGHT / 2);
@@ -269,6 +322,7 @@ export const createRenderer = (canvas: HTMLCanvasElement): Renderer => {
         for (let i = ripples.length - 1; i >= 0; i--) {
             const r = ripples[i];
             r.t += dt;
+            if (r.t < 0) continue; // staggered ripples wait their turn
             const p = r.t / 0.4;
             if (p >= 1) {
                 ripples.splice(i, 1);
@@ -297,6 +351,7 @@ export const createRenderer = (canvas: HTMLCanvasElement): Renderer => {
         }
 
         drawBoard(state);
+        drawPowerUp(state);
 
         for (const ball of state.balls) drawBall(ball);
 

@@ -5,9 +5,17 @@
  * board and for balance testing.
  */
 
-import type { ModeId } from './constants';
+import type { ModeId, PowerUpKind } from './constants';
 
 export type Team = 'day' | 'night';
+
+export interface PowerUp {
+    kind: PowerUpKind;
+    col: number;
+    row: number;
+    /** seconds since spawn; fades out at POWERUP_TTL */
+    age: number;
+}
 
 export interface Ball {
     team: Team;
@@ -52,6 +60,8 @@ export type EngineEvent =
       }
     | { type: 'miss'; side: 'player' | 'ai'; x: number }
     | { type: 'wall'; x: number; y: number }
+    | { type: 'powerup-spawn'; kind: PowerUpKind; x: number; y: number }
+    | { type: 'powerup'; kind: PowerUpKind; x: number; y: number }
     | { type: 'over'; winner: Team | 'draw' };
 
 export type EngineStatus = 'running' | 'over';
@@ -80,6 +90,12 @@ export interface EngineState {
     ramp: number;
     /** randomness source: Math.random normally, seeded for the daily duel */
     rng: () => number;
+    /** the one gift currently on the board, if any */
+    powerUp: PowerUp | null;
+    /** seconds until the next gift may appear */
+    powerUpClock: number;
+    /** seconds of widened paddle remaining */
+    wideTimer: number;
     /** drained by the orchestrator every frame for sound + fx */
     events: EngineEvent[];
     /** true while the board idles on the home page (two AI paddles, no timer) */

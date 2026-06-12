@@ -30,6 +30,10 @@ const HowToPlay = ({ onPlay, onHome }: HowToPlayProps) => (
                     Clean returns build a streak, and each one adds speed. A ball slipping past
                     you only resets the streak. Nothing else is lost.
                 </li>
+                <li>
+                    Gifts glow deep in the night. Claim one with your amber ball for a burst
+                    of captures, a wider paddle, or a whole row at once.
+                </li>
                 <li>After 90 seconds, whoever holds more of the board wins.</li>
             </ol>
 

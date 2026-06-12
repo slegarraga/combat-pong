@@ -194,6 +194,30 @@ export const playWall = (x: number) => {
     voice({ freq: 196, gain: 0.022, duration: 0.06, lowpass: 800, pan: panOf(x) });
 };
 
+/** A gift appeared: the faintest sparkle, just enough to make you look. */
+export const playPowerUpSpawn = (x: number) => {
+    voice({ freq: SCALE[10], gain: 0.035, duration: 0.3, type: 'sine', pan: panOf(x) });
+    voice({ freq: SCALE[12], gain: 0.022, duration: 0.35, type: 'sine', pan: panOf(x) });
+};
+
+/** A gift was claimed. Burst splashes a chord, wide steps up, wave runs the scale. */
+export const playPowerUpCollect = (kind: 'burst' | 'wide' | 'wave', x: number) => {
+    if (!ready()) return;
+    const pan = panOf(x);
+    if (kind === 'burst') {
+        for (const idx of [5, 8, 10]) {
+            voice({ freq: SCALE[idx], gain: 0.1, duration: 0.5, lowpass: 2600, pan });
+        }
+    } else if (kind === 'wide') {
+        voice({ freq: SCALE[5], gain: 0.11, duration: 0.3, pan });
+        setTimeout(() => voice({ freq: SCALE[8], gain: 0.11, duration: 0.45, pan }), 110);
+    } else {
+        [5, 7, 9, 11, 13].forEach((idx, i) => {
+            setTimeout(() => voice({ freq: SCALE[idx], gain: 0.09, duration: 0.35, pan: -0.5 + i * 0.25 }), i * 55);
+        });
+    }
+};
+
 /** A ball slipped past someone. Yours: a soft low thud. Theirs: a bright blip. */
 export const playMiss = (side: 'player' | 'ai', x: number) => {
     const pan = panOf(x);

@@ -16,13 +16,14 @@
 import {
     BOARD_SIZE, TILE_SIZE, GRID, SIM_STEP, MATCH_DURATION,
     HIT_STOP_MIN, HIT_STOP_SPEED, HIT_STOP_SLAM, RAMP_DURATION, RAMP_FLOOR,
-    BALL_RADIUS, BASE_SPEED, MAX_SPEED, STREAK_SPEED_CAP, SPEED_KICK,
+    BALL_RADIUS, BASE_SPEED, MAX_SPEED, AMBIENT_SPEED, STREAK_SPEED_CAP, SPEED_KICK,
     SPEED_KICK_FLAT, ENEMY_DAMPEN, AI_ENEMY_DAMPEN, AI_SPEED_KICK, MISS_SLOWDOWN, JITTER,
     MIN_VY_FRACTION, MIN_VX_FRACTION,
     PADDLE_WIDTH, PADDLE_HEIGHT, PADDLE_MARGIN, PADDLE_SMOOTHING,
     SLICE_FACTOR, SLICE_PADDLE_V_MAX, SLAM_PADDLE_SPEED,
     BOUNCE_ANGLE_MAX, TOTAL_ANGLE_MAX, EDGE_HIT_THRESHOLD,
-    MODES, type ModeId,
+    POWERUP_INTERVAL, POWERUP_TTL, WIDE_DURATION, WIDE_FACTOR,
+    MODES, type ModeId, type PowerUpKind,
 } from './constants';
 import type { Ball, EngineState, Paddle, Team } from './types';
 
@@ -57,8 +58,9 @@ export const mulberry32 = (seed: number) => {
 const spawnBall = (team: Team, index: number, speed: number, rng: () => number): Ball => {
     // Both balls open by rising away from the player: your amber ball starts
     // attacking immediately, the night ball detours before its first dive.
+    // Wide serve angles put diagonal energy on the board from second one.
     const lane = 0.3 + 0.4 * rng() + index * 0.07;
-    const angle = (rng() * 50 - 25) * (Math.PI / 180);
+    const angle = (rng() * 80 - 40) * (Math.PI / 180);
     return {
         team,
         x: BOARD_SIZE * Math.min(lane, 0.72),
@@ -80,7 +82,7 @@ export const createEngine = (mode: ModeId, ambient = false, seed?: number): Engi
             grid[row * GRID + col] = row < GRID / 2 ? NIGHT : DAY;
         }
     }
-    const speed = BASE_SPEED * cfg.speed * (ambient ? 0.62 : 1);
+    const speed = BASE_SPEED * cfg.speed * (ambient ? AMBIENT_SPEED : 1);
     const balls: Ball[] = [];
     for (let i = 0; i < cfg.pairs; i++) {
         balls.push(spawnBall('day', i, speed, rng));
@@ -104,6 +106,9 @@ export const createEngine = (mode: ModeId, ambient = false, seed?: number): Engi
         acc: 0,
         ramp: 0,
         rng,
+        powerUp: null,
+        powerUpClock: POWERUP_INTERVAL * (0.6 + rng() * 0.5),
+        wideTimer: 0,
         events: [],
         ambient,
     };
@@ -218,7 +223,7 @@ const collidePaddle = (
     // Offense and defense in one motion: slamming your own ball sends it off
     // faster; meeting an enemy ball cushions it so it limps back home.
     const ownBall = (side === 'player') === (ball.team === 'day');
-    const ambientScale = state.ambient ? 0.62 : 1;
+    const ambientScale = state.ambient ? AMBIENT_SPEED : 1;
     const floor = BASE_SPEED * MODES[state.mode].speed * 0.82 * ambientScale;
     let speed = speedOf(ball);
     if (side === 'player' && !state.ambient) {
@@ -303,6 +308,82 @@ const collideWalls = (state: EngineState, ball: Ball) => {
     }
 };
 
+/** Flip a single night tile to day, keeping every counter honest. */
+const claimTile = (state: EngineState, col: number, row: number) => {
+    const idx = row * GRID + col;
+    if (state.grid[idx] !== NIGHT) return false;
+    state.grid[idx] = DAY;
+    state.dayTiles += 1;
+    state.nightTiles -= 1;
+    if (!state.ambient) state.tilesFlipped += 1;
+    pushEvent(state, {
+        type: 'capture', team: 'day', col, row,
+        x: col * TILE_SIZE + TILE_SIZE / 2, y: row * TILE_SIZE + TILE_SIZE / 2,
+    });
+    return true;
+};
+
+/**
+ * A gift was claimed: deliver it. Burst takes the 3x3 around it, wide widens
+ * the paddle for a while, wave takes the whole row in one sweep.
+ */
+const applyPowerUp = (state: EngineState, kind: PowerUpKind, col: number, row: number) => {
+    if (kind === 'burst') {
+        for (let r = Math.max(0, row - 1); r <= Math.min(GRID - 1, row + 1); r++) {
+            for (let c = Math.max(0, col - 1); c <= Math.min(GRID - 1, col + 1); c++) {
+                claimTile(state, c, r);
+            }
+        }
+    } else if (kind === 'wide') {
+        state.wideTimer = WIDE_DURATION;
+    } else {
+        for (let c = 0; c < GRID; c++) claimTile(state, c, row);
+    }
+    pushEvent(state, {
+        type: 'powerup', kind,
+        x: col * TILE_SIZE + TILE_SIZE / 2, y: row * TILE_SIZE + TILE_SIZE / 2,
+    });
+};
+
+/**
+ * Gifts appear ON the frontier tile of a random column. Balls bounce off
+ * every tile they capture, so anything deeper would take several passes to
+ * carve out; the frontier tile is exactly one well-aimed return away.
+ * One at a time, and player-only by construction, since night tiles can
+ * only ever be flipped by the amber ball.
+ */
+const updatePowerUps = (state: EngineState, dt: number) => {
+    if (state.powerUp) {
+        state.powerUp.age += dt;
+        if (state.powerUp.age >= POWERUP_TTL) state.powerUp = null;
+        return;
+    }
+    state.powerUpClock -= dt;
+    if (state.powerUpClock > 0) return;
+    for (let attempt = 0; attempt < 20; attempt++) {
+        const col = 1 + Math.floor(state.rng() * (GRID - 2));
+        // The night tile closest to the player in this column is the frontier.
+        let frontier = -1;
+        for (let r = GRID - 1; r >= 0; r--) {
+            if (state.grid[r * GRID + col] === NIGHT) {
+                frontier = r;
+                break;
+            }
+        }
+        if (frontier < 1) continue; // the night is gone from this column
+        const row = frontier;
+        const roll = state.rng();
+        const kind: PowerUpKind = roll < 0.45 ? 'burst' : roll < 0.8 ? 'wide' : 'wave';
+        state.powerUp = { kind, col, row, age: 0 };
+        pushEvent(state, {
+            type: 'powerup-spawn', kind,
+            x: col * TILE_SIZE + TILE_SIZE / 2, y: row * TILE_SIZE + TILE_SIZE / 2,
+        });
+        break;
+    }
+    state.powerUpClock = POWERUP_INTERVAL * (0.7 + state.rng() * 0.6);
+};
+
 /**
  * Flip at most one enemy tile per step and bounce off it. One tile per step
  * keeps the frontier crisp; the tiny angle jitter keeps rallies from looping.
@@ -337,6 +418,12 @@ const collideTiles = (state: EngineState, ball: Ball) => {
         state.dayTiles += 1;
         state.nightTiles -= 1;
         if (!state.ambient) state.tilesFlipped += 1;
+        // Claimed a gift? Deliver it on the spot.
+        if (state.powerUp && state.powerUp.col === hitCol && state.powerUp.row === hitRow) {
+            const { kind } = state.powerUp;
+            state.powerUp = null;
+            applyPowerUp(state, kind, hitCol, hitRow);
+        }
     } else {
         state.dayTiles -= 1;
         state.nightTiles += 1;
@@ -370,7 +457,7 @@ const collideTiles = (state: EngineState, ball: Ball) => {
 /** Keep speed inside the mode envelope and the direction alive (no stalls). */
 const regulate = (state: EngineState, ball: Ball, dt: number) => {
     const cfg = MODES[state.mode];
-    const ambientScale = state.ambient ? 0.62 : 1;
+    const ambientScale = state.ambient ? AMBIENT_SPEED : 1;
     const max = streakCap(state) * ambientScale;
     const min = BASE_SPEED * cfg.speed * 0.82 * ambientScale;
     const speed = speedOf(ball);
@@ -403,6 +490,12 @@ const step = (state: EngineState, dt: number) => {
     } else {
         updatePaddle(state.player, dt);
         updateAITarget(state, state.ai, AI_LINE, true, dt);
+        updatePowerUps(state, dt);
+
+        // The wide gift eases in and out instead of snapping.
+        if (state.wideTimer > 0) state.wideTimer -= dt;
+        const targetWidth = PADDLE_WIDTH * (state.wideTimer > 0 ? WIDE_FACTOR : 1);
+        state.player.width = approach(state.player.width, targetWidth, 6, dt);
     }
 
     for (const ball of state.balls) {

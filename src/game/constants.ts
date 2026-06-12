@@ -22,10 +22,12 @@ export const HIT_STOP_SLAM = 0.012; // extra freeze on a slammed return
 export const RAMP_DURATION = 0.7; // slow-motion ease into every (re)start
 export const RAMP_FLOOR = 0.35; // timescale at the very first frame
 
-// Ball
+// Ball — tempo calibrated against the original Pong Wars (~680 px/s at 45°),
+// pulled back just enough to stay returnable with a paddle in the loop.
 export const BALL_RADIUS = 11;
-export const BASE_SPEED = 340; // px/s at streak 0, classic mode
-export const MAX_SPEED = 580; // base ceiling before streak bonus
+export const BASE_SPEED = 400; // px/s at streak 0, classic mode
+export const MAX_SPEED = 660; // base ceiling before streak bonus
+export const AMBIENT_SPEED = 0.85; // home-board factor: mesmerizing, not sleepy
 export const STREAK_SPEED_CAP = 1.55; // ceiling multiplier earned by streaks
 export const SPEED_KICK = 1.06; // multiplier when returning your own ball
 export const SPEED_KICK_FLAT = 16; // px/s added when returning your own ball
@@ -34,7 +36,9 @@ export const AI_ENEMY_DAMPEN = 0.97; // the AI cushions less effectively than yo
 export const AI_SPEED_KICK = 1.02; // AI slams its own balls far more gently
 export const MISS_SLOWDOWN = 0.86; // ball slows when it slips past a paddle
 export const JITTER = 14; // px/s² of organic drift so rallies never loop
-export const MIN_VY_FRACTION = 0.42; // anti-stall: vertical share of speed
+// Low vertical floor lets balls carve the long diagonals and pockets that
+// make Pong Wars hypnotic, while still guaranteeing they return to a paddle.
+export const MIN_VY_FRACTION = 0.22; // anti-stall: vertical share of speed
 export const MIN_VX_FRACTION = 0.08; // anti-stall: horizontal share of speed
 
 // Paddles
@@ -49,6 +53,14 @@ export const SLAM_PADDLE_SPEED = 480; // paddle px/s at contact that reads as a 
 export const BOUNCE_ANGLE_MAX = (55 * Math.PI) / 180; // edge-hit deflection
 export const TOTAL_ANGLE_MAX = (68 * Math.PI) / 180; // hard ceiling after slice
 export const EDGE_HIT_THRESHOLD = 0.88; // |hit point| that reads as an edge save
+
+// Power-ups — gifts that appear deep in the night; only your amber ball can
+// claim them, so every one is an invitation to push the frontier.
+export type PowerUpKind = 'burst' | 'wide' | 'wave';
+export const POWERUP_INTERVAL = 13; // mean seconds between spawns
+export const POWERUP_TTL = 12; // seconds before an unclaimed gift fades
+export const WIDE_DURATION = 8; // seconds of widened paddle
+export const WIDE_FACTOR = 1.45; // paddle width multiplier while wide
 
 // Modes — pairs of balls (1 day + 1 night each), global speed, AI strength
 export type ModeId = 'calm' | 'classic' | 'quick' | 'chaos';

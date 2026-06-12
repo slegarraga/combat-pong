@@ -11,6 +11,7 @@ Inspired by [Pong Wars](https://github.com/vnglst/pong-wars), with a paddle in y
 - The board starts split: your warm half below, the night above.
 - Slam **your** amber ball to send it deeper and faster; meet the enemy ball to cushion it away. Offense and defense live in the same motion.
 - Every clean return builds a streak that adds speed (and climbs the musical scale). A ball slipping past you only resets the streak — territory is the only score, so a miss never feels like death.
+- Gifts glow on the frontier: claim one with your amber ball for a burst of captures, a wider paddle, or a whole row at once.
 - After 90 seconds, whoever holds more tiles takes the duel.
 
 Four modes (Calm, Classic, Quick, Chaos) change the number of balls, the tempo, and how sharp the night plays. The **Daily Duel** serves the same seeded board to everyone in the world each UTC day; only your first attempt counts, day streaks add up, and your result shares as an emoji mosaic of your actual final frontier:
@@ -28,7 +29,7 @@ Combat Pong Daily #5 · 63% · 3-day streak
 
 The whole game is tuned to be **satisfying and relaxing at once**:
 
-- Two continuous masses of territory, no grid lines, an organic frontier with dawn light bleeding into the night.
+- Two continuous masses of territory, no grid lines, an organic frontier with dawn light bleeding into the night. Ball tempo and frontier drama are calibrated against the original Pong Wars demo (~680 px/s, long diagonal carves).
 - A fixed-timestep simulation (240 Hz) on a persistent accumulator, so the physics run at exactly the same pace on a 60 Hz laptop and a 144 Hz monitor.
 - Squash-and-stretch on every bounce axis, speed-scaled hit-stop, slam returns, slow-motion starts, soft trails and capture blooms. Feel lives in the simulation, not in screen shake.
 - On desktop, clicking the board captures your mouse (Pointer Lock), so the cursor can never leave the duel; Esc releases it and pauses.
