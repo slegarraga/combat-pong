@@ -1,122 +1,79 @@
 /**
- * Core type definitions for Combat Pong's anonymous duel mode.
- *
- * The player always controls the bottom paddle ("day"), while the top paddle
- * is driven by a simulated anonymous rival ("night"). The rival is entirely
- * local, but its timing, alias, signal strength, and narration are tuned to
- * feel like a live 1v1 duel.
+ * Core engine types. The player owns Day (bottom half, warm cream);
+ * the AI owns Night (top half, soft ink). The engine is pure TypeScript —
+ * no React, no canvas — so it can run headless for the home-page ambient
+ * board and for balance testing.
  */
+
+import type { ModeId } from './constants';
 
 export type Team = 'day' | 'night';
 
-export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD' | 'NIGHTMARE';
-
-export type FeedTone = 'neutral' | 'positive' | 'warning';
-
-export interface TrailPoint {
-    x: number;
-    y: number;
-    alpha: number;
-}
-
-/** A ball that paints territory for its team and carries its own momentum. */
 export interface Ball {
-    id: string;
-    x: number;
-    y: number;
-    vx: number;
-    vy: number;
     team: Team;
-    /**
-     * Persistent speed bonus granted by clean paddle returns.
-     * The player can snowball this aggressively with clean streak play.
-     */
-    speedMultiplier: number;
-    /**
-     * Extra tile captures awarded by clean returns.
-     *
-     * This is the core "feels amazing" mechanic: when the player stays in
-     * rhythm, each impact can rip through more territory than a normal touch.
-     */
-    captureCharge: number;
-    /**
-     * Short-lived directional bonus earned from strong edge returns.
-     *
-     * While active, the next invasion prefers to carve a short lane in the
-     * ball's travel direction, making high-skill cuts feel visibly different.
-     */
-    cutCharge: number;
-    trail: TrailPoint[];
-}
-
-/**
- * Horizontal paddle state.
- *
- * `targetX` lets input stay sticky to the board while `velocity` powers the
- * richer rebound, trail, and impact feel.
- */
-export interface Paddle {
-    x: number;
-    width: number;
-    height: number;
-    /** Latched destination from the latest input sample. */
-    targetX: number;
-    velocity: number;
-}
-
-/** Short-lived rings used to make hits and tile captures feel physical. */
-export interface ImpactRing {
     x: number;
     y: number;
-    radius: number;
-    alpha: number;
-    growth: number;
-    color: string;
+    vx: number; // px/s
+    vy: number; // px/s
+    /** 0..1 impact deformation, decays in the engine */
+    squash: number;
+    /** travel direction at impact, for squash orientation */
+    squashAngle: number;
+    /** recent positions, newest last, for trail rendering */
+    trail: { x: number; y: number }[];
 }
 
-/** Feed entries shown in the HUD to sell the "live anonymous duel" illusion. */
-export interface FeedEvent {
-    id: number;
-    text: string;
-    tone: FeedTone;
+export interface Paddle {
+    /** center x */
+    x: number;
+    /** pointer target the paddle eases toward */
+    targetX: number;
+    /** measured velocity (px/s) — adds slice to returns */
+    vx: number;
+    width: number;
+    /** 0..1 impact stretch, decays in the engine */
+    stretch: number;
 }
 
-/** Persona data used to make the rival feel distinct from match to match. */
-export interface RivalProfile {
-    alias: string;
-    title: string;
-    signature: string;
-    pingMs: number;
-    reaction: number;
-    aggression: number;
-    precision: number;
-    wobble: number;
-    feintWindow: number;
-}
+export type EngineEvent =
+    | { type: 'capture'; team: Team; col: number; row: number; x: number; y: number }
+    | { type: 'paddle'; side: 'player' | 'ai'; ballTeam: Team; x: number; y: number; speed: number; streak: number }
+    | { type: 'miss'; side: 'player' | 'ai'; x: number }
+    | { type: 'wall'; x: number; y: number }
+    | { type: 'over'; winner: Team | 'draw' };
 
-export interface ScoreSnapshot {
-    day: number;
-    night: number;
-}
+export type EngineStatus = 'running' | 'over';
 
-export interface MatchSummary {
-    difficulty: Difficulty;
-    rivalAlias: string;
-    playerWon: boolean;
-    dayPercent: number;
-    nightPercent: number;
-    margin: number;
-    bestStreak: number;
-}
-
-/** Complete mutable engine state owned by the animation loop. */
-export interface GameState {
-    ownership: Team[];
+export interface EngineState {
+    mode: ModeId;
+    /** tile ownership, row-major; values are 'day' | 'night' encoded as 0 | 1 */
+    grid: Uint8Array;
+    dayTiles: number;
+    nightTiles: number;
     balls: Ball[];
-    playerPaddle: Paddle;
-    aiPaddle: Paddle;
-    dayScore: number;
-    nightScore: number;
-    isRunning: boolean;
-    rival: RivalProfile;
+    player: Paddle;
+    ai: Paddle;
+    timeLeft: number;
+    status: EngineStatus;
+    winner: Team | 'draw' | null;
+    streak: number;
+    bestStreak: number;
+    /** tiles the player's balls converted this match */
+    tilesFlipped: number;
+    /** seconds of impact freeze remaining */
+    hitStop: number;
+    /** drained by the orchestrator every frame for sound + fx */
+    events: EngineEvent[];
+    /** true while the board idles on the home page (two AI paddles, no timer) */
+    ambient: boolean;
+}
+
+export interface MatchResult {
+    won: boolean;
+    draw: boolean;
+    dayShare: number; // 0..100
+    bestStreak: number;
+    tilesFlipped: number;
+    mode: ModeId;
+    grid: Uint8Array;
 }

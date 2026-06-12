@@ -1,140 +1,136 @@
 /**
- * Minimal lobby that gets the player into a duel with almost no friction.
- *
- * The page keeps one job above everything else: make the board feel desirable
- * immediately, then get out of the way.
+ * Home. One idea: the living board. A real simulation idles behind the title;
+ * one tap and you own the bottom paddle.
  */
 
-import { useEffect, useState } from 'react';
-import { DIFFICULTY } from '../game/constants';
-import type { Difficulty } from '../game/types';
+import { useEffect, useRef, useState } from 'react';
+import { MODES, MODE_ORDER, type ModeId } from '../game/constants';
+import { advance, createEngine } from '../game/engine';
+import { createRenderer } from '../game/render';
+import { getStats } from '../game/PlayerStats';
+import { getSavedMode, saveMode } from '../game/modePref';
+import { isSoundEnabled, setSoundEnabled, unlockAudio } from '../game/audio';
 
 interface MainMenuProps {
-    onStartGame: (difficulty: Difficulty) => void;
+    onPlay: (mode: ModeId) => void;
+    onHowTo: () => void;
 }
 
-const difficultyOrder: Difficulty[] = ['EASY', 'MEDIUM', 'HARD', 'NIGHTMARE'];
+const MainMenu = ({ onPlay, onHowTo }: MainMenuProps) => {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [mode, setMode] = useState<ModeId>(getSavedMode);
+    const [soundOn, setSoundOn] = useState(isSoundEnabled);
+    const stats = useRef(getStats());
 
-export const MainMenu = ({ onStartGame }: MainMenuProps) => {
-    const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>('MEDIUM');
-    const selectedSettings = DIFFICULTY[selectedDifficulty];
+    const chooseMode = (next: ModeId) => {
+        setMode(next);
+        saveMode(next);
+    };
+
+    // Ambient simulation behind the title.
+    useEffect(() => {
+        const canvas = canvasRef.current!;
+        const engine = createEngine('classic', true);
+        const renderer = createRenderer(canvas);
+        const observer = new ResizeObserver(() => renderer.resize());
+        observer.observe(canvas);
+
+        let raf = 0;
+        let last = performance.now();
+        const frame = (now: number) => {
+            raf = requestAnimationFrame(frame);
+            const dt = Math.min((now - last) / 1000, 0.05);
+            last = now;
+            advance(engine, dt);
+            renderer.ingest(engine.events);
+            engine.events.length = 0;
+            renderer.draw(engine, dt);
+        };
+        raf = requestAnimationFrame(frame);
+        return () => {
+            cancelAnimationFrame(raf);
+            observer.disconnect();
+        };
+    }, []);
 
     useEffect(() => {
-        const handleKeydown = (event: KeyboardEvent) => {
-            if (event.defaultPrevented) return;
-            if (event.key !== 'Enter') return;
-
-            const target = event.target;
-            if (target instanceof HTMLElement && ['BUTTON', 'A', 'INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) {
-                return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                unlockAudio();
+                onPlay(mode);
             }
-
-            event.preventDefault();
-            onStartGame(selectedDifficulty);
         };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [mode, onPlay]);
 
-        window.addEventListener('keydown', handleKeydown);
-        return () => window.removeEventListener('keydown', handleKeydown);
-    }, [onStartGame, selectedDifficulty]);
+    const toggleSound = () => {
+        const next = !isSoundEnabled();
+        setSoundEnabled(next);
+        setSoundOn(next);
+        if (next) unlockAudio();
+    };
+
+    const { games, wins } = stats.current;
 
     return (
-        <div className="relative min-h-screen min-h-[100dvh] overflow-hidden bg-[var(--cp-bg)] text-[var(--cp-text)]">
-            <div className="cp-home-bg fixed inset-0 pointer-events-none" />
-            <div className="cp-home-shell relative mx-auto flex min-h-screen w-full max-w-[66rem] flex-col px-4 py-4 sm:px-6 sm:py-6">
-                <header className="flex items-center justify-between gap-4">
-                    <p className="cp-kicker">Combat Pong</p>
-                    <a href="/controls" className="cp-home-utility-link">
-                        Controls
-                    </a>
-                </header>
+        <div className="home">
+            <header className="home-head">
+                <h1 className="wordmark">Combat Pong</h1>
+                <p className="tagline">A 90-second duel for territory.</p>
+            </header>
 
-                <main className="flex flex-1 items-center py-4 sm:py-6">
-                    <section className="grid w-full items-center gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(17.5rem,0.78fr)]">
-                        <div className="max-w-[31rem]">
-                            <p className="cp-home-mini">Anonymous territory duel</p>
-                            <h1 className="cp-display cp-home-title mt-3 text-white">Take the board.</h1>
-                            <p className="cp-home-lede mt-4 max-w-[30rem] text-[var(--cp-muted)]">
-                                Hit clean, build speed, rip lanes open. Ninety seconds decides the whole board.
-                            </p>
-
-                            <div className="mt-6 flex flex-wrap items-center gap-3">
-                                <button
-                                    onClick={() => onStartGame(selectedDifficulty)}
-                                    className="btn-gradient rounded-2xl px-5 py-3 text-base font-bold text-white"
-                                >
-                                    Drop in · {selectedSettings.label}
-                                </button>
-                                <a href="/how-to-play" className="cp-home-utility-link cp-home-inline-link">
-                                    How it works
-                                </a>
-                            </div>
-
-                            <p className="cp-home-note mt-4">No account. Instant drop-in. Enter starts.</p>
-
-                            <div className="mt-7 space-y-3">
-                                <div className="flex items-center justify-between gap-3">
-                                    <p className="cp-kicker">Pick the heat</p>
-                                    <span className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[var(--cp-muted)]">
-                                        {selectedDifficulty === 'MEDIUM' ? 'Best first run' : selectedSettings.label}
-                                    </span>
-                                </div>
-                                <div className="cp-home-difficulty-rail">
-                                    {difficultyOrder.map((difficulty) => {
-                                        const settings = DIFFICULTY[difficulty];
-                                        const isSelected = difficulty === selectedDifficulty;
-
-                                        return (
-                                            <button
-                                                key={difficulty}
-                                                type="button"
-                                                onClick={() => setSelectedDifficulty(difficulty)}
-                                                className={`cp-home-difficulty-pill ${isSelected ? 'cp-home-difficulty-pill-active' : ''}`}
-                                            >
-                                                <span className="cp-display text-[0.98rem] font-bold text-white">
-                                                    {settings.label}
-                                                </span>
-                                                <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--cp-muted)]">
-                                                    {settings.ballPairs * 2} balls
-                                                </span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                                <p className="cp-home-stage-note max-w-[31rem]">
-                                    {selectedSettings.subtitle}. Clean streaks snowball harder, and late comebacks can still rip the board away.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="mx-auto w-full max-w-[22.5rem] lg:max-w-none lg:justify-self-end">
-                            <button
-                                type="button"
-                                onClick={() => onStartGame(selectedDifficulty)}
-                                className="cp-home-stage-button group w-full text-left"
-                                aria-label={`Start ${selectedSettings.label} duel`}
-                            >
-                                <div className="cp-home-stage p-3.5 sm:p-4">
-                                    <div className="cp-home-stage-topline">
-                                        <span>{selectedSettings.label}</span>
-                                        <span>Start instantly</span>
-                                    </div>
-                                    <div className="cp-home-board">
-                                        <div className="cp-home-preview-paddle cp-home-preview-paddle-top" />
-                                        <div className="cp-home-preview-paddle cp-home-preview-paddle-bottom" />
-                                        <div className="cp-home-board-lane" />
-                                        <div className="cp-home-orb cp-home-orb-night" />
-                                        <div className="cp-home-orb cp-home-orb-day" />
-                                    </div>
-                                    <div className="cp-home-stage-footer mt-4">
-                                        <p className="cp-home-stage-hint">{selectedSettings.subtitle}</p>
-                                        <span className="cp-home-stage-cta">Drop in</span>
-                                    </div>
-                                </div>
-                            </button>
-                        </div>
-                    </section>
-                </main>
+            <div className="home-board">
+                <canvas ref={canvasRef} className="board-canvas" aria-hidden="true" />
             </div>
+
+            <div className="home-actions">
+                <button
+                    className="btn btn-play"
+                    onClick={() => {
+                        unlockAudio();
+                        onPlay(mode);
+                    }}
+                >
+                    Play
+                </button>
+
+                <div className="mode-row" role="radiogroup" aria-label="Mode">
+                    {MODE_ORDER.map((id) => (
+                        <button
+                            key={id}
+                            role="radio"
+                            aria-checked={mode === id}
+                            className={`mode-pill ${mode === id ? 'is-active' : ''}`}
+                            onClick={() => chooseMode(id)}
+                        >
+                            {MODES[id].label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <footer className="home-foot">
+                <button className="link-btn" onClick={onHowTo}>
+                    how to play
+                </button>
+                <span className="dot">·</span>
+                <button className="link-btn" onClick={toggleSound}>
+                    sound {soundOn ? 'on' : 'off'}
+                </button>
+                <span className="dot">·</span>
+                <a className="link-btn" href="https://github.com/slegarraga/combat-pong" target="_blank" rel="noreferrer">
+                    open source
+                </a>
+                {games > 0 && (
+                    <p className="home-stats">
+                        {games} {games === 1 ? 'duel' : 'duels'} · {Math.round((wins / games) * 100)}% won
+                    </p>
+                )}
+            </footer>
         </div>
     );
 };
+
+export default MainMenu;

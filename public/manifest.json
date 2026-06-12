@@ -1,11 +1,11 @@
 {
     "name": "Combat Pong",
     "short_name": "Combat Pong",
-    "description": "The most addictive territory control game. Face an anonymous rival instantly with no login or queue.",
+    "description": "A 90-second duel for territory. Day versus night on one board.",
     "start_url": "/",
     "display": "standalone",
-    "background_color": "#1a1a2e",
-    "theme_color": "#050b14",
+    "background_color": "#0E1014",
+    "theme_color": "#0E1014",
     "orientation": "portrait",
     "icons": [
         {
@@ -24,13 +24,5 @@
     "categories": [
         "games",
         "arcade"
-    ],
-    "screenshots": [
-        {
-            "src": "/screenshot-1.png",
-            "sizes": "1280x720",
-            "type": "image/png",
-            "label": "Combat Pong Gameplay"
-        }
     ]
 }

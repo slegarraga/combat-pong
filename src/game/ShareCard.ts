@@ -1,184 +1,124 @@
 /**
- * Local-only sharing helpers.
- *
- * Since the game no longer depends on Supabase storage, we keep the share loop
- * frictionless by generating an image locally, attempting a native share when
- * available, and otherwise downloading the card while copying the brag text.
+ * Share cards, generated locally — every card shows the player's actual final
+ * board, so no two are alike. Native share when available, otherwise download
+ * the image and copy the brag line.
  */
 
-import { COLORS, DIFFICULTY } from './constants';
-import type { Difficulty } from './types';
+import { GRID, COLORS, MODES } from './constants';
+import type { MatchResult } from './types';
 
-interface ShareCardData {
-    dayPercent: number;
-    difficulty: Difficulty;
-    playerWon?: boolean;
-    rivalAlias: string;
-    bestStreak: number;
-}
+const CARD = 1080;
 
-const shareFilename = () => `combat-pong-duel-${Date.now()}.png`;
-
-const drawRoundedRect = (
+const roundRectPath = (
     ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    radius: number,
+    x: number, y: number, w: number, h: number, r: number,
 ) => {
     ctx.beginPath();
-    ctx.moveTo(x + radius, y);
-    ctx.lineTo(x + width - radius, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-    ctx.lineTo(x + width, y + height - radius);
-    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-    ctx.lineTo(x + radius, y + height);
-    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-    ctx.lineTo(x, y + radius);
-    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
 };
 
-const getShareText = (data: ShareCardData) => {
-    const won = data.playerWon ?? data.dayPercent > 50;
-    const result = won ? 'won' : 'lost';
-    const difficultyLabel = DIFFICULTY[data.difficulty].label;
-
-    return `I ${result} an anonymous Combat Pong duel ${data.dayPercent}% to ${100 - data.dayPercent}% on ${difficultyLabel}. Rival: ${data.rivalAlias}. Best streak: ${data.bestStreak}x.`;
-};
-
-export const generateShareCard = async (data: ShareCardData): Promise<Blob> => {
+export const generateShareCard = async (result: MatchResult): Promise<Blob> => {
     const canvas = document.createElement('canvas');
-    canvas.width = 1200;
-    canvas.height = 630;
-    const ctx = canvas.getContext('2d');
+    canvas.width = CARD;
+    canvas.height = CARD;
+    const ctx = canvas.getContext('2d')!;
 
-    if (!ctx) {
-        throw new Error('Canvas rendering is unavailable.');
-    }
+    ctx.fillStyle = COLORS.page;
+    ctx.fillRect(0, 0, CARD, CARD);
 
-    const background = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-    background.addColorStop(0, COLORS.background);
-    background.addColorStop(0.55, COLORS.backgroundElevated);
-    background.addColorStop(1, COLORS.night);
-    ctx.fillStyle = background;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Final board, the real one from the match.
+    const boardSize = 560;
+    const bx = (CARD - boardSize) / 2;
+    const by = 150;
+    const tile = boardSize / GRID;
 
-    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-    ctx.lineWidth = 1;
-    for (let x = 0; x <= canvas.width; x += 32) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-    }
-    for (let y = 0; y <= canvas.height; y += 32) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
-    }
-
-    drawRoundedRect(ctx, 80, 72, 1040, 486, 34);
-    ctx.fillStyle = COLORS.surfaceStrong;
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    const accent = ctx.createLinearGradient(120, 0, 1080, 0);
-    accent.addColorStop(0, COLORS.dayAccent);
-    accent.addColorStop(1, COLORS.nightAccent);
-
-    ctx.font = '700 34px "Space Grotesk", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillStyle = COLORS.textMuted;
-    ctx.fillText('COMBAT PONG // ANONYMOUS DUEL', 128, 140);
-
-    ctx.font = '900 184px "Space Grotesk", sans-serif';
-    ctx.fillStyle = COLORS.text;
-    ctx.shadowColor = COLORS.dayAccent;
-    ctx.shadowBlur = 36;
-    ctx.fillText(`${data.dayPercent}%`, 120, 360);
-    ctx.shadowBlur = 0;
-
-    ctx.font = '700 28px "IBM Plex Mono", monospace';
-    ctx.fillStyle = COLORS.textMuted;
-    ctx.fillText('TERRITORY CONTROLLED', 128, 404);
-
-    ctx.fillStyle = accent;
-    ctx.font = '700 42px "Space Grotesk", sans-serif';
-    ctx.fillText(data.playerWon ?? data.dayPercent > 50 ? 'Victory secured' : 'Pressure broke late', 128, 478);
-
-    ctx.font = '600 26px "IBM Plex Mono", monospace';
-    ctx.fillStyle = COLORS.text;
-    ctx.fillText(`Rival  ${data.rivalAlias}`, 730, 182);
-    ctx.fillText(`Mode   ${DIFFICULTY[data.difficulty].label}`, 730, 230);
-    ctx.fillText(`Streak ${data.bestStreak}x`, 730, 278);
-    ctx.fillText(`Split  ${100 - data.dayPercent}% / ${data.dayPercent}%`, 730, 326);
-
-    ctx.font = '600 24px "Space Grotesk", sans-serif';
-    ctx.fillStyle = COLORS.textMuted;
-    ctx.fillText('No login. No queue. Just instant duel pressure.', 730, 396);
-    ctx.fillText('combatpong.com', 730, 438);
-
-    return new Promise((resolve, reject) => {
-        canvas.toBlob((blob) => {
-            if (!blob) {
-                reject(new Error('Unable to generate share card.'));
-                return;
+    ctx.save();
+    roundRectPath(ctx, bx, by, boardSize, boardSize, 28);
+    ctx.clip();
+    ctx.fillStyle = COLORS.night;
+    ctx.fillRect(bx, by, boardSize, boardSize);
+    ctx.fillStyle = COLORS.day;
+    for (let row = 0; row < GRID; row++) {
+        let runStart = -1;
+        for (let col = 0; col <= GRID; col++) {
+            const isDay = col < GRID && result.grid[row * GRID + col] === 0;
+            if (isDay && runStart < 0) runStart = col;
+            if (!isDay && runStart >= 0) {
+                ctx.fillRect(
+                    bx + runStart * tile - 0.5,
+                    by + row * tile - 0.5,
+                    (col - runStart) * tile + 1,
+                    tile + 1,
+                );
+                runStart = -1;
             }
-            resolve(blob);
-        }, 'image/png', 1);
+        }
+    }
+    ctx.restore();
+
+    const font = (size: number, weight = 500) =>
+        `${weight} ${size}px "Space Grotesk", -apple-system, sans-serif`;
+
+    // Wordmark
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(244, 240, 232, 0.55)';
+    ctx.font = font(34, 500);
+    ctx.fillText('C O M B A T   P O N G', CARD / 2, 96);
+
+    // Verdict + share
+    const verdict = result.draw ? 'Dead even.' : result.won ? 'I took the board.' : 'The night held it.';
+    ctx.fillStyle = '#F4F0E8';
+    ctx.font = font(58, 700);
+    ctx.fillText(verdict, CARD / 2, by + boardSize + 96);
+
+    ctx.fillStyle = result.won ? COLORS.dayText : COLORS.nightText;
+    ctx.font = font(120, 700);
+    ctx.fillText(`${result.dayShare}%`, CARD / 2, by + boardSize + 226);
+
+    ctx.fillStyle = 'rgba(244, 240, 232, 0.45)';
+    ctx.font = font(30, 500);
+    ctx.fillText(
+        `${MODES[result.mode].label} · best streak ×${result.bestStreak} · combatpong.com`,
+        CARD / 2,
+        by + boardSize + 286,
+    );
+
+    return await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('toBlob failed'))), 'image/png');
     });
 };
 
-const downloadBlob = (blob: Blob) => {
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = shareFilename();
-    anchor.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 500);
-};
+export const shareResult = async (result: MatchResult): Promise<'shared' | 'downloaded'> => {
+    const blob = await generateShareCard(result);
+    const text = result.won
+        ? `I took ${result.dayShare}% of the board in Combat Pong.`
+        : `The board got away from me this time: ${result.dayShare}% in Combat Pong.`;
+    const url = 'https://www.combatpong.com';
 
-export const shareToTwitter = async (
-    data: ShareCardData,
-): Promise<'shared' | 'copied' | 'downloaded'> => {
-    const shareText = getShareText(data);
-    const blob = await generateShareCard(data);
-    const file = new File([blob], shareFilename(), { type: 'image/png' });
-    const shareUrl = window.location.origin;
-
-    try {
-        if (navigator.share && navigator.canShare?.({ files: [file] })) {
-            await navigator.share({
-                title: 'Combat Pong',
-                text: shareText,
-                url: shareUrl,
-                files: [file],
-            });
-            return 'shared';
-        }
-    } catch (error) {
-        console.warn('Native share failed, using local fallback:', error);
-    }
-
-    let copied = false;
-    if (navigator.clipboard?.writeText) {
+    const file = new File([blob], 'combat-pong.png', { type: 'image/png' });
+    if (navigator.canShare?.({ files: [file] })) {
         try {
-            await navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
-            copied = true;
-        } catch (error) {
-            console.warn('Clipboard write failed:', error);
+            await navigator.share({ files: [file], text, url });
+            return 'shared';
+        } catch {
+            // user dismissed the sheet — fall through to download
         }
     }
 
-    downloadBlob(blob);
-
-    const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
-    window.open(tweetUrl, '_blank', 'width=550,height=420');
-
-    return copied ? 'copied' : 'downloaded';
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'combat-pong.png';
+    link.click();
+    URL.revokeObjectURL(link.href);
+    try {
+        await navigator.clipboard.writeText(`${text} ${url}`);
+    } catch {
+        // clipboard unavailable — the download alone is fine
+    }
+    return 'downloaded';
 };

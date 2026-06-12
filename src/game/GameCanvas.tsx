@@ -1,400 +1,284 @@
 /**
- * Anonymous duel HUD and canvas wrapper.
+ * The match screen. Owns the rAF loop and wires engine → renderer → audio.
  *
- * The engine stays in `useGameLoop`; this component focuses on presentation,
- * match summary handling, and local-only persistence/share flows.
+ * HUD numbers are written straight to the DOM (no re-renders at 60fps);
+ * React state only changes on phase transitions (playing / paused / over).
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { isArenaAudioEnabled, primeArenaAudio, setArenaAudioEnabled } from './audio';
-import { useGameLoop } from './GameLoop';
-import { CANVAS_SIZE, COLORS, DIFFICULTY } from './constants';
-import { recordGame } from './PlayerStats';
-import type { Difficulty } from './types';
+import { BOARD_SIZE, MATCH_DURATION, type ModeId } from './constants';
+import { advance, createEngine, dayShare, setPlayerTarget } from './engine';
+import { createRenderer, type Renderer } from './render';
+import { isSoundEnabled, playCapture, playEnd, playMiss, playPaddle, setSoundEnabled, unlockAudio } from './audio';
+import { recordMatch } from './PlayerStats';
+import { shareResult } from './ShareCard';
+import type { EngineState, MatchResult } from './types';
+
+type Phase = 'playing' | 'paused' | 'over';
+
+const formatClock = (seconds: number) => {
+    const s = Math.max(0, Math.ceil(seconds));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
 
 interface GameCanvasProps {
-    difficulty: Difficulty;
-    onBack?: () => void;
-    onChangeDifficulty?: (difficulty: Difficulty) => void;
+    mode: ModeId;
+    onHome: () => void;
 }
 
-const difficultyOrder: Difficulty[] = ['EASY', 'MEDIUM', 'HARD', 'NIGHTMARE'];
-
-export const GameCanvas = ({ difficulty, onBack, onChangeDifficulty }: GameCanvasProps) => {
+const GameCanvas = ({ mode, onHome }: GameCanvasProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const {
-        score,
-        timeRemaining,
-        bestStreak,
-        restart,
-        togglePause,
-        handleMouseMove,
-        handlePointerDelta,
-        handleTouchStart,
-        handleTouchMove,
-        handleTouchEnd,
-        handleTouchCancel,
-        isPaused,
-        gameOver,
-        rival,
-    } = useGameLoop(canvasRef, difficulty);
+    const boardRef = useRef<HTMLDivElement>(null);
+    const engineRef = useRef<EngineState>();
+    const rendererRef = useRef<Renderer>();
+    const phaseRef = useRef<Phase>('playing');
 
-    const [hasRecordedGame, setHasRecordedGame] = useState(false);
-    const [isPointerLocked, setIsPointerLocked] = useState(false);
-    const [isCoarsePointer, setIsCoarsePointer] = useState(false);
-    const [soundEnabled, setSoundEnabledState] = useState(() => isArenaAudioEnabled());
-    const arenaViewportStyle = {
-        maxWidth: isCoarsePointer
-            ? 'min(100%, calc(100dvh - 10.5rem), 33rem)'
-            : 'min(100%, 72dvh, 38rem)',
-    };
+    const clockRef = useRef<HTMLButtonElement>(null);
+    const dayPctRef = useRef<HTMLSpanElement>(null);
+    const nightPctRef = useRef<HTMLSpanElement>(null);
+    const barRef = useRef<HTMLDivElement>(null);
+    const streakRef = useRef<HTMLDivElement>(null);
 
-    const total = score.day + score.night;
-    const dayPercent = total > 0 ? Math.round((score.day / total) * 100) : 50;
-    const nightPercent = 100 - dayPercent;
-    const playerWon = dayPercent >= nightPercent;
-    const margin = dayPercent - nightPercent;
-    const difficultyMeta = DIFFICULTY[difficulty];
-    const clutchActive = timeRemaining <= 15;
-    const criticalActive = timeRemaining <= 5;
-    const difficultyIndex = difficultyOrder.indexOf(difficulty);
-    const harderDifficulty = difficultyOrder[difficultyIndex + 1];
-    const easierDifficulty = difficultyOrder[difficultyIndex - 1];
-    const suggestedDifficulty = playerWon ? harderDifficulty : easierDifficulty;
-    const suggestedDifficultyLabel = suggestedDifficulty ? DIFFICULTY[suggestedDifficulty].label : null;
-    const primaryActionLabel = playerWon ? 'Keep the arena' : 'Take it back';
-    const secondaryActionLabel = suggestedDifficulty && suggestedDifficultyLabel
-        ? playerWon
-            ? `Push harder · ${suggestedDifficultyLabel}`
-            : `Settle in · ${suggestedDifficultyLabel}`
-        : 'Back to home';
-    const postMatchHint = isCoarsePointer
-        ? 'Tap anywhere to rematch.'
-        : suggestedDifficulty
-            ? 'Click anywhere to rematch. Shift+Enter changes the heat.'
-            : 'Click anywhere to rematch.';
-    const exitLabel = isCoarsePointer ? 'Exit' : '← Exit';
-    const arenaMetaLine = isCoarsePointer ? rival.alias : `${rival.alias} · ${difficultyMeta.label}`;
+    const [phase, setPhase] = useState<Phase>('playing');
+    const [result, setResult] = useState<MatchResult | null>(null);
+    const [soundOn, setSoundOn] = useState(isSoundEnabled);
+    const [shareState, setShareState] = useState<'idle' | 'busy' | 'done'>('idle');
 
-    const formatTime = (seconds: number) => {
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = seconds % 60;
-        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-    };
-
-    const timerColor = timeRemaining <= 12
-        ? COLORS.danger
-        : timeRemaining <= 28
-            ? COLORS.warning
-            : COLORS.text;
-
-    useEffect(() => {
-        const mediaQuery = window.matchMedia('(pointer: coarse)');
-        const updatePointerMode = () => setIsCoarsePointer(mediaQuery.matches);
-
-        updatePointerMode();
-
-        if (typeof mediaQuery.addEventListener === 'function') {
-            mediaQuery.addEventListener('change', updatePointerMode);
-            return () => mediaQuery.removeEventListener('change', updatePointerMode);
-        }
-
-        mediaQuery.addListener(updatePointerMode);
-        return () => mediaQuery.removeListener(updatePointerMode);
+    const setPhaseBoth = useCallback((next: Phase) => {
+        phaseRef.current = next;
+        setPhase(next);
     }, []);
 
+    const restart = useCallback(() => {
+        engineRef.current = createEngine(mode);
+        setResult(null);
+        setShareState('idle');
+        setPhaseBoth('playing');
+    }, [mode, setPhaseBoth]);
+
+    // Boot engine + renderer + loop
     useEffect(() => {
-        const canvas = canvasRef.current;
-        document.body.classList.add('game-active');
-        return () => {
-            if (document.pointerLockElement === canvas) {
-                document.exitPointerLock?.();
+        const canvas = canvasRef.current!;
+        engineRef.current = createEngine(mode);
+        rendererRef.current = createRenderer(canvas);
+        setResult(null);
+        setPhaseBoth('playing');
+
+        const observer = new ResizeObserver(() => rendererRef.current?.resize());
+        observer.observe(canvas);
+
+        let raf = 0;
+        let last = performance.now();
+        let lastClock = '';
+        let lastShare = -1;
+
+        const frame = (now: number) => {
+            raf = requestAnimationFrame(frame);
+            const dt = Math.min((now - last) / 1000, 0.05);
+            last = now;
+            const engine = engineRef.current!;
+            const renderer = rendererRef.current!;
+
+            if (phaseRef.current === 'playing') {
+                advance(engine, dt);
+
+                const events = engine.events;
+                if (events.length > 0) {
+                    renderer.ingest(events);
+                    for (const e of events) {
+                        if (e.type === 'capture') playCapture(e.team, e.row);
+                        else if (e.type === 'paddle') {
+                            playPaddle(e.side, e.streak, (e.side === 'player') === (e.ballTeam === 'day'));
+                        } else if (e.type === 'miss') playMiss(e.side);
+                        else if (e.type === 'over') {
+                            const final: MatchResult = {
+                                won: e.winner === 'day',
+                                draw: e.winner === 'draw',
+                                dayShare: dayShare(engine),
+                                bestStreak: engine.bestStreak,
+                                tilesFlipped: engine.tilesFlipped,
+                                mode,
+                                grid: engine.grid.slice(),
+                            };
+                            recordMatch(final);
+                            playEnd(final.draw ? 'draw' : final.won ? 'win' : 'loss');
+                            setResult(final);
+                            setPhaseBoth('over');
+                        }
+                    }
+                    events.length = 0;
+                }
+
+                // HUD: write straight to the DOM, only when values change.
+                const clock = formatClock(engine.timeLeft);
+                if (clock !== lastClock && clockRef.current) {
+                    lastClock = clock;
+                    clockRef.current.textContent = clock;
+                    clockRef.current.classList.toggle('clock-low', engine.timeLeft <= 10);
+                }
+                const share = dayShare(engine);
+                if (share !== lastShare) {
+                    lastShare = share;
+                    if (dayPctRef.current) dayPctRef.current.textContent = String(share);
+                    if (nightPctRef.current) nightPctRef.current.textContent = String(100 - share);
+                    if (barRef.current) barRef.current.style.width = `${share}%`;
+                }
+                if (streakRef.current) {
+                    const streak = engine.streak;
+                    streakRef.current.textContent = `×${streak}`;
+                    streakRef.current.classList.toggle('streak-visible', streak >= 3);
+                }
             }
-            document.body.classList.remove('game-active');
+
+            renderer.draw(engine, dt);
+        };
+        raf = requestAnimationFrame(frame);
+
+        return () => {
+            cancelAnimationFrame(raf);
+            observer.disconnect();
+        };
+    }, [mode, setPhaseBoth]);
+
+    // Pointer → paddle
+    useEffect(() => {
+        const board = boardRef.current!;
+        const handlePointer = (e: PointerEvent) => {
+            const rect = board.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * BOARD_SIZE;
+            if (engineRef.current) setPlayerTarget(engineRef.current, x);
+        };
+        const handleDown = (e: PointerEvent) => {
+            unlockAudio();
+            handlePointer(e);
+        };
+        board.addEventListener('pointermove', handlePointer);
+        board.addEventListener('pointerdown', handleDown);
+        return () => {
+            board.removeEventListener('pointermove', handlePointer);
+            board.removeEventListener('pointerdown', handleDown);
         };
     }, []);
 
+    // Keyboard
     useEffect(() => {
-        const handlePointerLockChange = () => {
-            setIsPointerLocked(document.pointerLockElement === canvasRef.current);
-        };
-
-        const handleLockedMouseMove = (event: MouseEvent) => {
-            if (document.pointerLockElement !== canvasRef.current || !canvasRef.current) return;
-
-            const rect = canvasRef.current.getBoundingClientRect();
-            const scaleX = CANVAS_SIZE / rect.width;
-            handlePointerDelta(event.movementX * scaleX);
-        };
-
-        document.addEventListener('pointerlockchange', handlePointerLockChange);
-        document.addEventListener('mousemove', handleLockedMouseMove);
-
-        return () => {
-            document.removeEventListener('pointerlockchange', handlePointerLockChange);
-            document.removeEventListener('mousemove', handleLockedMouseMove);
-        };
-    }, [handlePointerDelta]);
-
-    useEffect(() => {
-        if ((gameOver || isPaused) && document.pointerLockElement === canvasRef.current) {
-            document.exitPointerLock?.();
-        }
-    }, [gameOver, isPaused]);
-
-    useEffect(() => {
-        if (!gameOver || hasRecordedGame) return;
-
-        recordGame({
-            result: playerWon ? 'win' : 'loss',
-            territoryPercent: dayPercent,
-            bestStreak,
-            margin,
-            difficulty,
-            rivalAlias: rival.alias,
-        });
-        setHasRecordedGame(true);
-    }, [bestStreak, dayPercent, difficulty, gameOver, hasRecordedGame, margin, playerWon, rival.alias]);
-
-    const handleRestart = useCallback(() => {
-        setHasRecordedGame(false);
-        restart();
-    }, [restart]);
-
-    const handleDifficultyJump = useCallback((nextDifficulty: Difficulty) => {
-        setHasRecordedGame(false);
-
-        if (nextDifficulty === difficulty || !onChangeDifficulty) {
-            restart();
-            return;
-        }
-
-        onChangeDifficulty(nextDifficulty);
-    }, [difficulty, onChangeDifficulty, restart]);
-
-    const handlePostMatchSecondary = useCallback(() => {
-        if (suggestedDifficulty) {
-            handleDifficultyJump(suggestedDifficulty);
-            return;
-        }
-
-        onBack?.();
-    }, [handleDifficultyJump, onBack, suggestedDifficulty]);
-
-    const handleSoundToggle = useCallback(() => {
-        const nextValue = !soundEnabled;
-        setSoundEnabledState(nextValue);
-        setArenaAudioEnabled(nextValue);
-    }, [soundEnabled]);
-
-    const handleArenaTouchStart = useCallback((event: React.TouchEvent<HTMLCanvasElement>) => {
-        handleTouchStart(event);
-        void primeArenaAudio();
-    }, [handleTouchStart]);
-
-    const lockCursorToArena = useCallback(() => {
-        void primeArenaAudio();
-
-        if (gameOver || isPaused || isCoarsePointer) return;
-        canvasRef.current?.requestPointerLock?.();
-    }, [gameOver, isCoarsePointer, isPaused]);
-
-    const resultLine = `${dayPercent}% board · ${bestStreak}x peak · ${margin > 0 ? '+' : ''}${margin}% swing`;
-
-    useEffect(() => {
-        const handleHotkeys = (event: KeyboardEvent) => {
-            if (event.repeat) return;
-
-            if (gameOver && event.key === 'Enter' && event.shiftKey && suggestedDifficulty) {
-                event.preventDefault();
-                handleDifficultyJump(suggestedDifficulty);
-                return;
-            }
-
-            if (gameOver && (event.key === 'Enter' || event.key === ' ')) {
-                event.preventDefault();
-                handleRestart();
-                return;
-            }
-
-            if (!gameOver && (event.key === 'p' || event.key === 'P')) {
-                event.preventDefault();
-                togglePause();
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                if (phaseRef.current === 'playing') setPhaseBoth('paused');
+                else if (phaseRef.current === 'paused') setPhaseBoth('playing');
+            } else if (e.key === 'm' || e.key === 'M') {
+                const next = !isSoundEnabled();
+                setSoundEnabled(next);
+                setSoundOn(next);
+                if (next) unlockAudio();
+            } else if ((e.key === 'Enter' || e.key === ' ') && phaseRef.current === 'over') {
+                e.preventDefault();
+                restart();
             }
         };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [restart, setPhaseBoth]);
 
-        window.addEventListener('keydown', handleHotkeys);
-        return () => window.removeEventListener('keydown', handleHotkeys);
-    }, [gameOver, handleDifficultyJump, handleRestart, suggestedDifficulty, togglePause]);
+    const toggleSound = () => {
+        const next = !isSoundEnabled();
+        setSoundEnabled(next);
+        setSoundOn(next);
+        if (next) unlockAudio();
+    };
+
+    const handleShare = async () => {
+        if (!result || shareState === 'busy') return;
+        setShareState('busy');
+        try {
+            await shareResult(result);
+            setShareState('done');
+        } catch {
+            setShareState('idle');
+        }
+    };
+
+    const verdict = result ? (result.draw ? 'Dead even.' : result.won ? 'You took the board.' : 'The night held it.') : '';
 
     return (
-        <div className="min-h-screen min-h-[100dvh] overflow-hidden bg-[var(--cp-bg)] text-[var(--cp-text)]">
-            <div className="cp-arena-noise fixed inset-0 pointer-events-none" />
-            <div className="relative mx-auto flex min-h-screen w-full max-w-[42rem] flex-col px-3 py-3 sm:px-6 sm:py-5">
-                <main className="flex flex-1 items-center justify-center py-0.5 sm:py-1">
-                    <section className="w-full space-y-1" style={arenaViewportStyle}>
-                        <div className="flex items-center justify-between gap-2">
-                            <div className="flex min-w-0 items-center gap-2">
-                                {onBack && (
-                                    <button
-                                        onClick={onBack}
-                                        className="cp-chip min-h-[40px] rounded-full px-3 py-1.5 text-[12px] font-semibold text-[var(--cp-muted)] transition hover:text-white"
-                                    >
-                                        {exitLabel}
-                                    </button>
-                                )}
-                                <p className="truncate text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--cp-muted)] sm:text-[12px]">
-                                    {arenaMetaLine}
-                                </p>
-                            </div>
-                            <div
-                                className={`cp-timer-pill cp-display rounded-full border border-white/10 px-3 py-1 text-[1.05rem] sm:px-3.5 sm:py-1.5 sm:text-lg ${clutchActive ? 'cp-timer-pill-clutch' : ''} ${criticalActive ? 'cp-timer-pill-critical' : ''}`}
-                                style={{ color: timerColor }}
-                            >
-                                {formatTime(timeRemaining)}
-                            </div>
-                        </div>
+        <div className="match">
+            <header className="match-top">
+                <button className="ghost-btn" onClick={onHome} aria-label="Back to home">
+                    ←
+                </button>
+                <button
+                    className="clock"
+                    ref={clockRef}
+                    aria-label="Pause"
+                    onClick={() => {
+                        if (phaseRef.current === 'playing') setPhaseBoth('paused');
+                        else if (phaseRef.current === 'paused') setPhaseBoth('playing');
+                    }}
+                >
+                    {formatClock(MATCH_DURATION)}
+                </button>
+                <button className="ghost-btn" onClick={toggleSound} aria-label={soundOn ? 'Mute' : 'Unmute'}>
+                    {soundOn ? '♪' : '∅'}
+                </button>
+            </header>
 
-                        <section
-                            className={`cp-panel cp-arena-stage p-1.5 sm:p-2 ${clutchActive ? 'cp-arena-stage-clutch' : ''} ${criticalActive ? 'cp-arena-stage-critical' : ''}`}
-                        >
-                            <div className="mb-1.5">
-                                {!isCoarsePointer && (
-                                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--cp-muted)]">
-                                        {difficultyMeta.label}
-                                    </p>
-                                )}
-                                <div className="mb-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.14em] sm:text-[11px]">
-                                        <span style={{ color: COLORS.nightBall }}>{nightPercent}% rival</span>
-                                        <span style={{ color: COLORS.dayAccent }}>{dayPercent}% you</span>
-                                </div>
-                                <div className="h-2 overflow-hidden rounded-full bg-black/40">
-                                    <div className="flex h-full">
-                                        <div style={{ width: `${nightPercent}%`, background: `linear-gradient(90deg, ${COLORS.night}, ${COLORS.nightAccent})` }} />
-                                        <div style={{ width: `${dayPercent}%`, background: `linear-gradient(90deg, ${COLORS.dayAccent}, ${COLORS.day})` }} />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-black/18 p-1 shadow-[0_18px_46px_rgba(0,0,0,0.42)] sm:p-1.5">
-                                {clutchActive && !gameOver && (
-                                    <div className="pointer-events-none absolute inset-x-0 top-2.5 z-10 flex justify-center">
-                                        <div className={`cp-chip rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${criticalActive ? 'text-rose-100' : 'text-amber-100'}`}>
-                                            {criticalActive ? `${timeRemaining}s left` : 'Clutch'}
-                                        </div>
-                                    </div>
-                                )}
-                                <canvas
-                                    ref={canvasRef}
-                                    width={CANVAS_SIZE}
-                                    height={CANVAS_SIZE}
-                                    className="relative z-[1] aspect-square w-full cursor-none touch-none rounded-[20px] sm:rounded-[22px]"
-                                    onClick={lockCursorToArena}
-                                    onMouseMove={isPointerLocked ? undefined : handleMouseMove}
-                                    onTouchMove={handleTouchMove}
-                                    onTouchStart={handleArenaTouchStart}
-                                    onTouchEnd={handleTouchEnd}
-                                    onTouchCancel={handleTouchCancel}
-                                />
-
-                                {isPaused && !gameOver && (
-                                    <div className="absolute inset-0 z-20 flex items-center justify-center rounded-[20px] px-4 py-5 sm:rounded-[22px]">
-                                        <div className="cp-overlay-scrim absolute inset-0 rounded-[20px] sm:rounded-[22px]" />
-                                        <div className="cp-overlay-card relative max-w-[16.5rem] text-center">
-                                            <p className="cp-kicker cp-overlay-kicker">Paused</p>
-                                            <h2 className="mt-2 text-3xl font-black">Hold the pressure</h2>
-                                            <p className="cp-overlay-copy mt-2 text-sm">Resume when you are ready to pick the duel back up.</p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {gameOver && (
-                                    <div
-                                        className="absolute inset-0 z-20 flex cursor-pointer items-center justify-center rounded-[20px] px-4 py-5 sm:rounded-[22px] sm:px-5 sm:py-6"
-                                        onClick={handleRestart}
-                                        onKeyDown={(event) => {
-                                            if (event.key === 'Enter' || event.key === ' ') {
-                                                event.preventDefault();
-                                                handleRestart();
-                                            }
-                                        }}
-                                        role="button"
-                                        tabIndex={0}
-                                    >
-                                        <div className="cp-overlay-scrim absolute inset-0 rounded-[20px] sm:rounded-[22px]" />
-                                        <div className="cp-overlay-card relative w-full max-w-[17.25rem] text-center sm:max-w-[18.5rem]">
-                                            <p className="cp-kicker cp-overlay-kicker">Match complete</p>
-                                            <h2
-                                                className="cp-display mt-2 text-[1.8rem] font-black sm:text-[2.25rem]"
-                                                style={{ color: playerWon ? COLORS.success : COLORS.nightBall }}
-                                            >
-                                                {playerWon ? 'Arena secured' : 'Rival held firm'}
-                                            </h2>
-                                            <p className="cp-overlay-copy mt-3 text-[0.98rem] leading-relaxed">
-                                                {playerWon
-                                                    ? `Held ${dayPercent}% against ${rival.alias}. Stay in rhythm.`
-                                                    : `${rival.alias} closed ${nightPercent}% to ${dayPercent}. Run it back now.`}
-                                            </p>
-
-                                            <p className="cp-overlay-meta mt-4 text-[12px] font-semibold uppercase tracking-[0.14em]">
-                                                {resultLine}
-                                            </p>
-
-                                            <div className="mt-5 space-y-2">
-                                                <button
-                                                    onClick={(event) => {
-                                                        event.stopPropagation();
-                                                        handleRestart();
-                                                    }}
-                                                    className="btn-gradient w-full justify-center rounded-2xl px-5 py-3.5 text-base font-bold text-white"
-                                                >
-                                                    {primaryActionLabel}
-                                                </button>
-                                                <button
-                                                    onClick={(event) => {
-                                                        event.stopPropagation();
-                                                        handlePostMatchSecondary();
-                                                    }}
-                                                    className="cp-button-secondary w-full justify-center px-4 py-3 text-sm"
-                                                >
-                                                    {secondaryActionLabel}
-                                                </button>
-                                            </div>
-                                            <p className="cp-overlay-hint mt-4 text-[11px] font-semibold uppercase tracking-[0.14em]">
-                                                {postMatchHint}
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {!gameOver && (
-                                <div className={`mt-2 flex gap-2 ${isCoarsePointer ? 'flex-wrap' : 'items-center justify-end'}`}>
-                                    <button
-                                        onClick={handleSoundToggle}
-                                        className={`cp-button-secondary min-h-[44px] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] sm:px-3.5 sm:text-[12px] ${isCoarsePointer ? 'flex-1 justify-center' : ''}`}
-                                    >
-                                        {soundEnabled ? 'Sound on' : 'Sound off'}
-                                    </button>
-                                    <button
-                                        onClick={togglePause}
-                                        disabled={gameOver}
-                                        className={`cp-button-secondary min-h-[44px] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] disabled:opacity-50 sm:px-3.5 sm:text-[12px] ${isCoarsePointer ? 'flex-1 justify-center' : ''}`}
-                                    >
-                                        {isPaused ? 'Resume' : 'Pause'}
-                                    </button>
-                                    <button
-                                        onClick={handleRestart}
-                                        className={`cp-button-secondary min-h-[44px] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] sm:px-3.5 sm:text-[12px] ${isCoarsePointer ? 'w-full justify-center' : ''}`}
-                                    >
-                                        Reset
-                                    </button>
-                                </div>
-                            )}
-                        </section>
-                    </section>
-                </main>
+            <div className="share-row">
+                <span className="pct pct-day" ref={dayPctRef}>50</span>
+                <div className="share-track">
+                    <div className="share-fill" ref={barRef} style={{ width: '50%' }} />
+                </div>
+                <span className="pct pct-night" ref={nightPctRef}>50</span>
             </div>
+
+            <div className="board" ref={boardRef}>
+                <canvas ref={canvasRef} className="board-canvas" />
+                <div className="streak-chip" ref={streakRef} aria-hidden="true" />
+
+                {phase === 'paused' && (
+                    <div className="overlay">
+                        <p className="overlay-title">Paused</p>
+                        <div className="overlay-actions">
+                            <button className="btn btn-primary" onClick={() => setPhaseBoth('playing')}>
+                                Resume
+                            </button>
+                            <button className="btn" onClick={restart}>
+                                Restart
+                            </button>
+                        </div>
+                        <button className="link-btn" onClick={onHome}>
+                            home
+                        </button>
+                    </div>
+                )}
+
+                {phase === 'over' && result && (
+                    <div className="overlay">
+                        <p className="overlay-title">{verdict}</p>
+                        <p className={`overlay-share ${result.won ? 'is-day' : 'is-night'}`}>{result.dayShare}%</p>
+                        <p className="overlay-meta">
+                            best streak ×{result.bestStreak} · {result.tilesFlipped} tiles flipped
+                        </p>
+                        <div className="overlay-actions">
+                            <button className="btn btn-primary" onClick={restart}>
+                                Play again
+                            </button>
+                            <button className="btn" onClick={handleShare} disabled={shareState === 'busy'}>
+                                {shareState === 'done' ? 'Shared ✓' : 'Share'}
+                            </button>
+                        </div>
+                        <button className="link-btn" onClick={onHome}>
+                            home
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            <p className="match-hint">
+                move to defend the cream
+                <span className="hint-keys"> · esc pause · m sound</span>
+            </p>
         </div>
     );
 };
+
+export default GameCanvas;

@@ -1,370 +1,163 @@
 /**
- * Tiny synth-based audio layer for Combat Pong.
+ * Generative soundscape — no asset files, just the Web Audio API.
  *
- * The game should feel more alive without relying on asset files or a backend.
- * These helpers generate extremely short tones with the Web Audio API and stay
- * silent until the user interacts with the page. Sound is persistent and can
- * be toggled off from the arena HUD.
+ * Every sound is drawn from the D major pentatonic scale, so any sequence of
+ * captures and returns is musical by construction: the board literally plays
+ * wind chimes as the frontier moves. Day events ring bright and warm; night
+ * events answer darker and quieter. Nothing is loud, nothing is harsh.
  */
 
-const SOUND_KEY = 'combat_pong_sound_enabled_v1';
+const SOUND_KEY = 'cp:sound';
 
-let cachedEnabled: boolean | null = null;
-let audioContext: AudioContext | null = null;
+// D major pentatonic across three octaves (D3 root).
+const SCALE = [
+    146.83, 164.81, 185.0, 220.0, 246.94,
+    293.66, 329.63, 369.99, 440.0, 493.88,
+    587.33, 659.26, 739.99, 880.0, 987.77,
+];
 
-const getStoredEnabled = () => {
-    if (typeof window === 'undefined') return true;
-
+let ctx: AudioContext | null = null;
+let master: GainNode | null = null;
+let enabled = (() => {
     try {
-        const value = window.localStorage.getItem(SOUND_KEY);
-        return value === null ? true : value === 'true';
+        return localStorage.getItem(SOUND_KEY) !== '0';
     } catch {
         return true;
     }
-};
+})();
 
-const getAudioContext = () => {
-    if (typeof window === 'undefined') return null;
+let lastCaptureAt = 0;
+let lastPaddleAt = 0;
 
-    const AudioContextConstructor = window.AudioContext
-        ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+export const isSoundEnabled = () => enabled;
 
-    if (!AudioContextConstructor) return null;
-
-    if (!audioContext) {
-        audioContext = new AudioContextConstructor();
+export const setSoundEnabled = (value: boolean) => {
+    enabled = value;
+    try {
+        localStorage.setItem(SOUND_KEY, value ? '1' : '0');
+    } catch {
+        // private mode — keep the in-memory preference
     }
-
-    return audioContext;
 };
 
-const playVoice = (
-    context: AudioContext,
-    {
-        frequency,
-        endFrequency = frequency,
-        duration = 0.07,
-        gain = 0.03,
-        type = 'triangle',
-        delay = 0,
-        q,
-    }: {
-        frequency: number;
-        endFrequency?: number;
-        duration?: number;
-        gain?: number;
-        type?: OscillatorType;
-        delay?: number;
-        q?: number;
-    },
-) => {
-    const now = context.currentTime + delay;
-    const oscillator = context.createOscillator();
-    const amp = context.createGain();
-    const filter = context.createBiquadFilter();
+/** Create/resume the context. Must be called from a user gesture at least once. */
+export const unlockAudio = () => {
+    if (!enabled) return;
+    if (!ctx) {
+        const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        if (!Ctor) return;
+        ctx = new Ctor();
+        const compressor = ctx.createDynamicsCompressor();
+        compressor.threshold.value = -20;
+        compressor.ratio.value = 8;
+        master = ctx.createGain();
+        master.gain.value = 0.5;
+        master.connect(compressor);
+        compressor.connect(ctx.destination);
+    }
+    if (ctx.state === 'suspended') void ctx.resume();
+};
 
-    oscillator.type = type;
-    oscillator.frequency.setValueAtTime(frequency, now);
-    oscillator.frequency.exponentialRampToValueAtTime(Math.max(40, endFrequency), now + duration);
+const ready = () => enabled && ctx !== null && ctx.state === 'running' && master !== null;
 
+interface VoiceOpts {
+    freq: number;
+    gain: number;
+    duration: number;
+    type?: OscillatorType;
+    lowpass?: number;
+    detune?: number;
+    glideTo?: number;
+}
+
+const voice = ({ freq, gain, duration, type = 'triangle', lowpass = 2400, detune = 0, glideTo }: VoiceOpts) => {
+    if (!ready()) return;
+    const t = ctx!.currentTime;
+    const osc = ctx!.createOscillator();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    if (glideTo) osc.frequency.exponentialRampToValueAtTime(glideTo, t + duration);
+    osc.detune.value = detune;
+
+    const filter = ctx!.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.value = 2200;
-    if (typeof q === 'number') {
-        filter.Q.value = q;
-    }
+    filter.frequency.value = lowpass;
 
-    amp.gain.setValueAtTime(0.0001, now);
-    amp.gain.exponentialRampToValueAtTime(gain, now + 0.01);
-    amp.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    const env = ctx!.createGain();
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(gain, t + 0.005);
+    env.gain.exponentialRampToValueAtTime(0.0004, t + duration);
 
-    oscillator.connect(filter);
-    filter.connect(amp);
-    amp.connect(context.destination);
-
-    oscillator.start(now);
-    oscillator.stop(now + duration + 0.02);
+    osc.connect(filter);
+    filter.connect(env);
+    env.connect(master!);
+    osc.start(t);
+    osc.stop(t + duration + 0.02);
 };
 
-const withAudio = (callback: (context: AudioContext) => void) => {
-    if (!isArenaAudioEnabled()) return;
+/**
+ * A tile changed hands. Row maps to pitch: pushing deep into enemy ground
+ * literally sounds like climbing the scale.
+ */
+export const playCapture = (team: 'day' | 'night', row: number) => {
+    if (!ready()) return;
+    const now = performance.now();
+    if (now - lastCaptureAt < 45) return;
+    lastCaptureAt = now;
 
-    const context = getAudioContext();
-    if (!context || context.state !== 'running') return;
-
-    callback(context);
-};
-
-export const isArenaAudioEnabled = () => {
-    if (cachedEnabled === null) {
-        cachedEnabled = getStoredEnabled();
-    }
-
-    return cachedEnabled;
-};
-
-export const setArenaAudioEnabled = (enabled: boolean) => {
-    cachedEnabled = enabled;
-
-    if (typeof window !== 'undefined') {
-        try {
-            window.localStorage.setItem(SOUND_KEY, String(enabled));
-        } catch {
-            // Ignore storage failures and keep the in-memory preference.
-        }
-    }
-
-    if (!enabled && audioContext && audioContext.state === 'running') {
-        void audioContext.suspend();
-        return;
-    }
-
-    if (enabled) {
-        void primeArenaAudio();
+    if (team === 'day') {
+        const depth = 1 - row / 23; // higher row = deeper into night = higher note
+        const idx = 5 + Math.round(depth * 9);
+        const freq = SCALE[Math.min(idx, SCALE.length - 1)];
+        voice({ freq, gain: 0.085, duration: 0.42 });
+        voice({ freq: freq * 2, gain: 0.022, duration: 0.3, type: 'sine' });
+    } else {
+        const depth = row / 23;
+        const idx = Math.max(0, 4 - Math.round(depth * 4));
+        voice({ freq: SCALE[idx], gain: 0.045, duration: 0.3, lowpass: 1100 });
     }
 };
 
-export const primeArenaAudio = async () => {
-    if (!isArenaAudioEnabled()) return;
+/** Paddle contact: a warm pluck that climbs the scale as your streak grows. */
+export const playPaddle = (side: 'player' | 'ai', streak: number, ownBall: boolean) => {
+    if (!ready()) return;
+    const now = performance.now();
+    if (now - lastPaddleAt < 30) return;
+    lastPaddleAt = now;
 
-    const context = getAudioContext();
-    if (!context) return;
-
-    if (context.state !== 'running') {
-        await context.resume();
+    if (side === 'player') {
+        if (ownBall) {
+            const idx = Math.min(3 + Math.min(streak, 10), SCALE.length - 1);
+            const freq = SCALE[idx];
+            voice({ freq, gain: 0.15, duration: 0.24, lowpass: 3200, detune: -4 });
+            voice({ freq, gain: 0.1, duration: 0.2, lowpass: 3200, detune: 5 });
+        } else {
+            // Cushioning an enemy ball: padded, low, reassuring.
+            voice({ freq: SCALE[1], gain: 0.1, duration: 0.16, type: 'sine', lowpass: 900 });
+        }
+    } else {
+        voice({ freq: SCALE[2], gain: 0.03, duration: 0.12, lowpass: 1200 });
     }
 };
 
-export const playPaddleImpactSound = ({
-    owner,
-    streak,
-    charge,
-    impactPower,
-    speed,
-}: {
-    owner: 'player' | 'rival';
-    streak: number;
-    charge: number;
-    impactPower: number;
-    speed: number;
-}) => {
-    withAudio((context) => {
-        const baseFrequency = owner === 'player'
-            ? 280 + Math.min(streak, 10) * 18 + charge * 28 + impactPower * 32
-            : 210 + charge * 12 + impactPower * 18;
-        const gain = owner === 'player'
-            ? 0.026 + impactPower * 0.02 + Math.min(speed / 28, 0.012)
-            : 0.014 + impactPower * 0.009;
-        const duration = owner === 'player'
-            ? 0.05 + impactPower * 0.028
-            : 0.048 + impactPower * 0.014;
-
-        playVoice(context, {
-            frequency: baseFrequency,
-            endFrequency: owner === 'player' ? baseFrequency * (1.34 + impactPower * 0.16) : baseFrequency * (1.15 + impactPower * 0.08),
-            duration,
-            gain,
-            type: owner === 'player' ? 'triangle' : 'sine',
-        });
-
-        if (owner === 'player' && charge > 0) {
-            playVoice(context, {
-                frequency: baseFrequency * 0.5,
-                endFrequency: baseFrequency * (0.72 + impactPower * 0.08),
-                duration: 0.08 + impactPower * 0.015,
-                gain: 0.014 + charge * 0.003 + impactPower * 0.005,
-                type: 'sine',
-                delay: 0.008,
-            });
-        }
-
-        if (owner === 'player' && impactPower > 0.72) {
-            playVoice(context, {
-                frequency: baseFrequency * 2.1,
-                endFrequency: baseFrequency * 1.45,
-                duration: 0.03 + impactPower * 0.012,
-                gain: 0.01 + impactPower * 0.008,
-                type: 'square',
-                delay: 0.004,
-            });
-        }
-
-        if (owner === 'player' && (impactPower > 0.92 || speed > 13)) {
-            playVoice(context, {
-                frequency: baseFrequency * 0.36,
-                endFrequency: baseFrequency * 0.2,
-                duration: 0.06 + impactPower * 0.02,
-                gain: 0.012 + impactPower * 0.008 + Math.min(speed / 42, 0.006),
-                type: 'sawtooth',
-            });
-            playVoice(context, {
-                frequency: baseFrequency * 3.1,
-                endFrequency: baseFrequency * 2.2,
-                duration: 0.022 + impactPower * 0.008,
-                gain: 0.008 + impactPower * 0.006,
-                type: 'square',
-                delay: 0.003,
-                q: 2.2,
-            });
-        }
-
-        if (owner === 'player' && (impactPower > 1.12 || speed > 15.2)) {
-            playVoice(context, {
-                frequency: baseFrequency * 0.24,
-                endFrequency: baseFrequency * 0.16,
-                duration: 0.085 + impactPower * 0.024,
-                gain: 0.01 + impactPower * 0.008 + Math.min(speed / 46, 0.007),
-                type: 'sawtooth',
-                delay: 0.002,
-            });
-            playVoice(context, {
-                frequency: baseFrequency * 4.2,
-                endFrequency: baseFrequency * 2.9,
-                duration: 0.018 + impactPower * 0.007,
-                gain: 0.007 + impactPower * 0.006,
-                type: 'square',
-                delay: 0.001,
-                q: 3,
-            });
-        }
-    });
+/** A ball slipped past someone. Yours: a soft low thud. Theirs: a bright blip. */
+export const playMiss = (side: 'player' | 'ai') => {
+    if (side === 'player') {
+        voice({ freq: 110, gain: 0.12, duration: 0.35, type: 'sine', lowpass: 500, glideTo: 65 });
+    } else {
+        voice({ freq: SCALE[11], gain: 0.05, duration: 0.18, type: 'sine' });
+    }
 };
 
-export const playOverdrivePulseSound = (intensity: number) => {
-    withAudio((context) => {
-        const safeIntensity = Math.min(intensity, 8);
-        const base = 220 + safeIntensity * 20;
-
-        playVoice(context, {
-            frequency: base,
-            endFrequency: base * 1.42,
-            duration: 0.08 + safeIntensity * 0.005,
-            gain: 0.014 + safeIntensity * 0.0018,
-            type: 'triangle',
-        });
-        playVoice(context, {
-            frequency: base * 0.46,
-            endFrequency: base * 0.26,
-            duration: 0.11 + safeIntensity * 0.008,
-            gain: 0.01 + safeIntensity * 0.0015,
-            type: 'sawtooth',
-            delay: 0.01,
-        });
-        playVoice(context, {
-            frequency: base * 2.4,
-            endFrequency: base * 1.7,
-            duration: 0.024 + safeIntensity * 0.004,
-            gain: 0.008 + safeIntensity * 0.0012,
-            type: 'square',
-            delay: 0.006,
-            q: 2.4,
-        });
-    });
-};
-
-export const playClutchEnterSound = () => {
-    withAudio((context) => {
-        playVoice(context, {
-            frequency: 240,
-            endFrequency: 320,
-            duration: 0.12,
-            gain: 0.022,
-            type: 'triangle',
-        });
-        playVoice(context, {
-            frequency: 320,
-            endFrequency: 440,
-            duration: 0.11,
-            gain: 0.018,
-            type: 'square',
-            delay: 0.05,
-        });
-    });
-};
-
-export const playClutchPulseSound = (secondsLeft: number) => {
-    withAudio((context) => {
-        const urgent = secondsLeft <= 5;
-        const baseFrequency = urgent
-            ? 220 + (5 - secondsLeft) * 26
-            : 176 + (10 - secondsLeft) * 8;
-
-        playVoice(context, {
-            frequency: baseFrequency,
-            endFrequency: baseFrequency * (urgent ? 1.22 : 1.08),
-            duration: urgent ? 0.12 : 0.08,
-            gain: urgent ? 0.022 : 0.014,
-            type: urgent ? 'square' : 'triangle',
-        });
-
-        if (urgent) {
-            playVoice(context, {
-                frequency: baseFrequency * 0.72,
-                endFrequency: baseFrequency * 0.86,
-                duration: 0.08,
-                gain: 0.012,
-                type: 'sine',
-                delay: 0.035,
-            });
-        }
-    });
-};
-
-export const playTileBreakSound = (captureCount: number, team: 'day' | 'night', intensity = 0) => {
-    withAudio((context) => {
-        const frequency = team === 'day' ? 170 + captureCount * 34 : 145 + captureCount * 24;
-
-        playVoice(context, {
-            frequency,
-            endFrequency: frequency * 0.9,
-            duration: 0.07,
-            gain: 0.012 + captureCount * 0.004,
-            type: team === 'day' ? 'square' : 'triangle',
-        });
-
-        if (captureCount > 1) {
-            playVoice(context, {
-                frequency: frequency * 1.9,
-                endFrequency: frequency * 1.35,
-                duration: 0.055,
-                gain: 0.01 + captureCount * 0.002,
-                type: 'triangle',
-                delay: 0.015,
-            });
-        }
-
-        if (team === 'day' && intensity > 2) {
-            playVoice(context, {
-                frequency: Math.max(72, frequency * 0.48),
-                endFrequency: Math.max(52, frequency * 0.22),
-                duration: 0.08 + Math.min(intensity, 6) * 0.008,
-                gain: 0.01 + Math.min(intensity, 6) * 0.0025,
-                type: 'sawtooth',
-            });
-        }
-    });
-};
-
-export const playMissSound = (owner: 'player' | 'rival') => {
-    withAudio((context) => {
-        playVoice(context, {
-            frequency: owner === 'player' ? 210 : 180,
-            endFrequency: owner === 'player' ? 92 : 120,
-            duration: 0.16,
-            gain: owner === 'player' ? 0.03 : 0.016,
-            type: 'sawtooth',
-        });
-    });
-};
-
-export const playFinishSound = (playerWon: boolean) => {
-    withAudio((context) => {
-        if (playerWon) {
-            playVoice(context, { frequency: 360, endFrequency: 520, duration: 0.12, gain: 0.04, type: 'triangle' });
-            playVoice(context, { frequency: 520, endFrequency: 690, duration: 0.14, gain: 0.032, type: 'triangle', delay: 0.08 });
-            return;
-        }
-
-        playVoice(context, { frequency: 250, endFrequency: 160, duration: 0.14, gain: 0.028, type: 'sawtooth' });
-        playVoice(context, { frequency: 160, endFrequency: 110, duration: 0.16, gain: 0.022, type: 'triangle', delay: 0.06 });
+/** Match end: a gentle resolution, never a fanfare. */
+export const playEnd = (outcome: 'win' | 'loss' | 'draw') => {
+    if (!ready()) return;
+    const notes =
+        outcome === 'win' ? [5, 8, 9, 12] : outcome === 'loss' ? [5, 3, 1] : [5, 5];
+    notes.forEach((idx, i) => {
+        setTimeout(() => {
+            voice({ freq: SCALE[idx], gain: 0.12, duration: 0.6, lowpass: 2000 });
+            voice({ freq: SCALE[idx] * 2, gain: 0.025, duration: 0.5, type: 'sine' });
+        }, i * 130);
     });
 };

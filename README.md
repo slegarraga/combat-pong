@@ -1,140 +1,68 @@
 # Combat Pong
 
-Combat Pong is a territory-control arcade game inspired by [Pong Wars](https://github.com/vnglst/pong-wars), rebuilt around an **anonymous duel** fantasy.
+A 90-second duel for territory. Day versus night on one board.
 
-There are no accounts and no backend dependency in the critical gameplay loop. Every match drops the player into an instant anonymous duel built for fast starts, sharp pressure, and repeat plays.
+Inspired by [Pong Wars](https://github.com/vnglst/pong-wars), with a paddle in your hand: balls flip every tile they touch on enemy ground, clean returns build a streak, and whoever holds more of the board when the clock runs out wins.
 
-**[Play now](https://www.combatpong.com)**
+**[Play now → combatpong.com](https://www.combatpong.com)**
 
-## Core loop
+## How it plays
 
-- The board starts split between your side and the rival side.
-- Balls convert enemy tiles on impact.
-- Clean paddle returns build a streak and make your touches more dangerous.
-- Every match introduces a fresh rival identity and pressure profile.
-- After 90 seconds, whoever controls more territory wins the duel.
+- The board starts split: your warm half below, the night above.
+- Slam **your** amber ball to send it deeper and faster; meet the enemy ball to cushion it away. Offense and defense live in the same motion.
+- Every clean return builds a streak that adds speed (and climbs the musical scale). A ball slipping past you only resets the streak — territory is the only score, so a miss never feels like death.
+- After 90 seconds, whoever holds more tiles takes the duel.
 
-## What changed
+Four modes — Calm, Classic, Quick, Chaos — change the number of balls, the tempo, and how sharp the night plays.
 
-- Removed all account, auth, matchmaking, storage, and realtime code.
-- Rebuilt the main game loop around faster anonymous duel pacing.
-- Upgraded the board feel with cleaner rendering, better trails, impact rings, particles, and stronger HUD feedback.
-- Moved player progression to a simple on-device stats model.
-- Reworked sharing so score cards are created on the fly with no upload step.
-- Updated UI copy and metadata so the product no longer claims real multiplayer.
+## Design
 
-## Tech stack
+The whole game is tuned to be **satisfying and relaxing at once**:
+
+- Two continuous masses of territory, no grid lines, an organic frontier with dawn light bleeding into the night.
+- A fixed-timestep simulation (240 Hz), so the physics feel identical on every display.
+- Squash-and-stretch, 28 ms hit-stop, soft trails and capture blooms — feel lives in the simulation, not in screen shake.
+- A generative soundscape on the D major pentatonic scale: captures are wind chimes, returns are warm plucks. Any sequence is musical by construction.
+
+## Tech
 
 | Layer | Technology |
 | --- | --- |
 | Framework | React 18 + TypeScript |
 | Build | Vite |
-| Styling | Tailwind CSS + custom CSS variables |
-| Rendering | HTML5 canvas + `requestAnimationFrame` |
-| Persistence | `localStorage` |
+| Rendering | HTML5 canvas, device-pixel-snapped tiles |
+| Audio | Web Audio API (no asset files) |
+| Persistence | `localStorage` (no accounts, no backend) |
 | Deployment | Vercel |
 
 ## Project structure
 
 ```text
 src/
-├── App.tsx                     # Tiny pathname router + route rendering
-├── index.css                   # Global theme, surface system, shared UI classes
+├── App.tsx                 # Tiny pathname router
+├── index.css               # Design system
 ├── components/
-│   ├── MainMenu.tsx            # Anonymous duel lobby / mode selection
-│   ├── SEOPages.tsx            # Mode landing pages + how-to-play
-│   ├── MoreSEOPages.tsx        # FAQ, About, Tips, anonymous duel guide
-│   ├── ExtendedSEOPages.tsx    # Mechanics guides
-│   ├── AdditionalSEOPages.tsx  # History, updates, challenges, browser support
-│   ├── TargetedSEOPages.tsx    # Audience-targeted landing pages
-│   ├── MoreTargetedSEOPages.tsx
-│   ├── FinalSEOPages.tsx
-│   └── SEOFooter.tsx
-├── game/
-│   ├── GameCanvas.tsx          # Canvas shell, HUD, overlays, post-match flow
-│   ├── GameLoop.ts             # Anonymous duel engine
-│   ├── ShareCard.ts            # Local share card generation + share fallback
-│   ├── PlayerStats.ts          # Local-only career stats
-│   ├── rivals.ts               # Rival persona generation and feed helpers
-│   ├── constants.ts            # Tuning surface for feel and visuals
-│   └── types.ts                # Core engine types
-└── main.tsx
+│   ├── MainMenu.tsx        # Home — a live ambient board and one Play button
+│   └── HowToPlay.tsx       # The rules, in four sentences
+└── game/
+    ├── engine.ts           # Pure simulation: physics, AI, streaks, events
+    ├── render.ts           # Canvas renderer: territory, trails, blooms
+    ├── audio.ts            # Generative pentatonic soundscape
+    ├── GameCanvas.tsx      # Match screen: rAF loop, input, HUD, overlays
+    ├── ShareCard.ts        # Result cards drawn from your actual final board
+    ├── PlayerStats.ts      # Local career stats
+    ├── constants.ts        # The tuning surface
+    └── types.ts            # Engine types
 ```
 
 ## Development
 
-### Requirements
-
-- Node.js 18+
-- npm
-
-### Install
-
 ```bash
-git clone https://github.com/slegarraga/combat-pong.git
-cd combat-pong
 npm install
+npm run dev      # local dev server
+npm run build    # type-check + production build
+npm run lint     # eslint
 ```
-
-No environment variables are required.
-
-### Commands
-
-```bash
-npm run dev
-npm run build
-npm run lint
-npm run preview
-```
-
-## Architecture notes
-
-### Anonymous duel engine
-
-`src/game/GameLoop.ts` owns the entire match:
-
-1. Creates a rival persona for the selected difficulty.
-2. Initializes the grid, paddles, and ball set.
-3. Runs a frame loop that updates AI timing, collisions, tiles, streaks, and effects.
-4. Emits a lightweight “live duel” feed and fluctuating signal/ping values.
-5. Keeps React state updates focused on HUD values, while canvas rendering stays imperative.
-
-### Rival system
-
-`src/game/rivals.ts` generates:
-
-- Rival aliases
-- Rival titles and signatures
-- Aggression / precision / wobble parameters
-- Feed lines for opening pressure, lead changes, clutch moments, and resets
-
-### Local-only progression
-
-`src/game/PlayerStats.ts` stores:
-
-- wins / losses
-- best board percentage
-- best streak
-- best margin
-- favorite difficulty
-- last rival alias
-
-Everything is stored in `localStorage`.
-
-## Contributing
-
-Good next directions:
-
-- add opt-in audio feedback
-- add new rival archetypes
-- add alternate board themes
-- add daily challenge rulesets
-- add accessibility presets for motion and contrast
-
-## Credits
-
-- Inspired by [Pong Wars](https://github.com/vnglst/pong-wars) by Koen van Gilst
-- Built with [React](https://react.dev), [Vite](https://vitejs.dev), and [Tailwind CSS](https://tailwindcss.com)
 
 ## License
 

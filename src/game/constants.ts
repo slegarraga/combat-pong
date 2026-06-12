@@ -1,199 +1,80 @@
 /**
- * Shared constants for the anonymous duel experience.
+ * Tuning surface — every value that shapes how the game looks and feels.
  *
- * These values are intentionally grouped here so designers and engineers can
- * retune feel, visuals, and difficulty without hunting through the game loop.
+ * The board is a 600x600 logical canvas split into a 24x24 grid of 25px tiles.
+ * The bottom half belongs to Day (the player), the top half to Night (the AI).
+ * All speeds are in px/second against that logical canvas; the simulation runs
+ * on a fixed timestep so the feel is identical on any refresh rate.
  */
 
-import type { Difficulty } from './types';
-
-export const CANVAS_SIZE = 600;
+// Board
+export const BOARD_SIZE = 600;
 export const TILE_SIZE = 25;
-export const GRID_WIDTH = CANVAS_SIZE / TILE_SIZE;
-export const GRID_HEIGHT = CANVAS_SIZE / TILE_SIZE;
+export const GRID = BOARD_SIZE / TILE_SIZE; // 24
+export const TILE_COUNT = GRID * GRID; // 576
 
-export const MATCH_DURATION = 90;
+// Simulation
+export const SIM_STEP = 1 / 240; // fixed physics step (seconds)
+export const MATCH_DURATION = 90; // seconds
+export const HIT_STOP = 0.028; // brief freeze on paddle impact (tactile weight)
 
-export const PADDLE_WIDTH = 112;
-export const PADDLE_HEIGHT = 14;
-export const PADDLE_OFFSET = 18;
-/**
- * Paddle feel tuning.
- *
- * The player paddle follows a latched target rather than snapping directly to
- * the pointer. Edge-hit values tune how sharply expert contacts peel away from
- * the paddle once the player clips the outer lanes.
- */
-export const PADDLE_TARGET_RESPONSE = 0.28;
-export const PADDLE_TARGET_BLEND = 0.42;
-export const PADDLE_MAX_TRAVEL_SPEED = 42;
-export const PADDLE_DAMPING = 0.86;
-export const PADDLE_POINTER_GAIN = 1.08;
-/**
- * Touch drags intentionally move a little farther than the raw finger delta.
- *
- * That extra gain lets players steer from a comfortable thumb position instead
- * of sitting directly on top of the paddle and hiding the read.
- */
-export const PADDLE_TOUCH_GAIN = 1.14;
-export const PADDLE_IMPACT_REFERENCE_SPEED = 24;
-/**
- * Clean late saves should still feel possible when the player is moving with intent.
- *
- * The game is more satisfying when near-edge reads turn into dramatic returns
- * instead of cheap-looking whiffs, so the player paddle gets a modest dynamic
- * catch window that grows with velocity and streak.
- */
-export const PADDLE_RETURN_GRACE_BASE = 8;
-export const PADDLE_RETURN_GRACE_VELOCITY_STEP = 0.2;
-export const PADDLE_RETURN_GRACE_STREAK_STEP = 1.1;
-export const PADDLE_RETURN_GRACE_MAX = 24;
-export const PADDLE_EDGE_WINDOW_START = 0.52;
-export const PADDLE_EDGE_WINDOW_RANGE = 0.4;
-export const PADDLE_EDGE_SPIN_BONUS = 3.2;
-export const PADDLE_EDGE_SPEED_BONUS = 0.82;
-export const PADDLE_EDGE_IMPACT_BONUS = 0.24;
-export const PADDLE_EDGE_CUT_CHARGE = 0.92;
-export const BALL_CUT_CHARGE_MAX = 1.6;
-export const BALL_CUT_LANE_RANGE = TILE_SIZE * 2.35;
-export const BALL_CUT_LANE_WIDTH = TILE_SIZE * 0.92;
-export const BALL_CUT_LANE_MAX_BONUS_CAPTURES = 2;
-/**
- * Impact juice tuning.
- *
- * Strong player contacts now drag the simulation for a blink so the hit lands
- * with more weight, and very fast balls get a brighter speed wake.
- */
-export const IMPACT_HIT_STOP_THRESHOLD = 0.88;
-export const IMPACT_HIT_STOP_MAX = 0.58;
-export const IMPACT_HIT_STOP_RECOVERY = 0.28;
-export const BALL_SPEED_TRAIL_THRESHOLD = 10.8;
+// Ball
+export const BALL_RADIUS = 11;
+export const BASE_SPEED = 340; // px/s at streak 0, classic mode
+export const MAX_SPEED = 580; // base ceiling before streak bonus
+export const STREAK_SPEED_CAP = 1.55; // ceiling multiplier earned by streaks
+export const SPEED_KICK = 1.06; // multiplier when returning your own ball
+export const SPEED_KICK_FLAT = 16; // px/s added when returning your own ball
+export const ENEMY_DAMPEN = 0.9; // returning an enemy ball cushions it (defense)
+export const AI_ENEMY_DAMPEN = 0.97; // the AI cushions less effectively than you
+export const AI_SPEED_KICK = 1.02; // AI slams its own balls far more gently
+export const MISS_SLOWDOWN = 0.86; // ball slows when it slips past a paddle
+export const JITTER = 14; // px/s² of organic drift so rallies never loop
+export const MIN_VY_FRACTION = 0.42; // anti-stall: vertical share of speed
+export const MIN_VX_FRACTION = 0.08; // anti-stall: horizontal share of speed
 
-/**
- * Core feel tuning.
- *
- * These values intentionally bias toward quick reads, fast escalation, and
- * rewarding player streaks rather than slow attrition.
- */
-export const OPENING_LAUNCH_SPEED = 6.3;
-export const OPENING_HOOK_WINDOW = 10;
-export const OPENING_HOOK_MAX_RETURNS = 4;
-export const OPENING_HOOK_SPEED_BONUS = 0.46;
-export const OPENING_HOOK_CAPTURE_BONUS = 1;
-export const OPENING_HOOK_CUT_BONUS = 0.18;
-export const OPENING_HOOK_DAMAGE_BONUS = 1;
-export const CLUTCH_SWING_WINDOW = 8;
-export const CLUTCH_SWING_SPEED_BONUS = 0.54;
-export const CLUTCH_SWING_CAPTURE_BONUS = 1;
-export const CLUTCH_SWING_CUT_BONUS = 0.24;
-export const CLUTCH_SWING_DAMAGE_BONUS = 2;
-export const CLUTCH_COMEBACK_MARGIN = 12;
-export const CLUTCH_COMEBACK_DAMAGE_BONUS = 2;
-export const MAX_SPEED = 14.4;
-export const MIN_SPEED = 5.1;
-export const BASE_ACCELERATION = 0.1;
-export const PLAYER_RETURN_BOOST = 0.72;
-export const RIVAL_RETURN_BOOST = 0.34;
-export const PLAYER_SPIN_FACTOR = 7.8;
-export const RIVAL_SPIN_FACTOR = 6.1;
-export const STREAK_SPEED_STEP = 0.18;
-export const STREAK_OVERDRIVE_START = 4;
-export const STREAK_OVERDRIVE_SPEED_STEP = 0.2;
-export const STREAK_OVERDRIVE_IMPACT_STEP = 0.26;
-export const STREAK_OVERDRIVE_CAPTURE_STEP = 2;
-export const MAX_CAPTURE_CHARGE = 7;
-/**
- * Destruction tuning.
- *
- * Once the player accelerates the ball and keeps a clean streak alive, tile
- * invasions should become obviously more violent, not just numerically better.
- */
-export const PLAYER_DESTRUCTION_SPEED_THRESHOLD = 7.4;
-export const PLAYER_DESTRUCTION_SPEED_STEP = 1.35;
-export const PLAYER_DESTRUCTION_MAX_BONUS = 6;
-export const PLAYER_DESTRUCTION_RANGE_STEP = TILE_SIZE * 0.52;
-export const BALL_RADIUS = TILE_SIZE / 2;
-export const TRAIL_LENGTH = 7;
+// Paddles
+export const PADDLE_WIDTH = 110;
+export const PADDLE_HEIGHT = 13;
+export const PADDLE_MARGIN = 30; // gap between paddle and its wall
+export const PADDLE_SMOOTHING = 0.03; // pointer-follow time constant (s); lower = snappier
+export const SLICE_FACTOR = 0.22; // how much paddle velocity bends the ball
+export const BOUNCE_ANGLE_MAX = (55 * Math.PI) / 180; // edge-hit deflection
 
+// Modes — pairs of balls (1 day + 1 night each), global speed, AI strength
+export type ModeId = 'calm' | 'classic' | 'quick' | 'chaos';
+
+export interface ModeConfig {
+    id: ModeId;
+    label: string;
+    pairs: number;
+    speed: number; // multiplies BASE_SPEED / MAX_SPEED
+    aiRate: number; // exponential tracking rate (1/s)
+    aiMaxSpeed: number; // px/s
+}
+
+export const MODES: Record<ModeId, ModeConfig> = {
+    calm: { id: 'calm', label: 'Calm', pairs: 1, speed: 0.78, aiRate: 2.6, aiMaxSpeed: 420 },
+    classic: { id: 'classic', label: 'Classic', pairs: 1, speed: 1.0, aiRate: 3.6, aiMaxSpeed: 560 },
+    quick: { id: 'quick', label: 'Quick', pairs: 2, speed: 1.12, aiRate: 4.6, aiMaxSpeed: 700 },
+    chaos: { id: 'chaos', label: 'Chaos', pairs: 3, speed: 1.24, aiRate: 5.6, aiMaxSpeed: 860 },
+};
+
+export const MODE_ORDER: ModeId[] = ['calm', 'classic', 'quick', 'chaos'];
+
+// Palette — day glows warm, night stays soft. No grid lines, ever.
 export const COLORS = {
-    background: '#050b14',
-    backgroundElevated: '#0a1522',
-    surface: 'rgba(10, 18, 28, 0.78)',
-    surfaceStrong: 'rgba(8, 13, 20, 0.9)',
-    boardFrame: '#12273d',
-    gridLine: 'rgba(119, 161, 196, 0.12)',
-    centerLine: 'rgba(255, 255, 255, 0.08)',
-    text: '#edf4ff',
-    textMuted: '#8fa6bd',
-    textDim: '#60748a',
-    success: '#7effb3',
-    warning: '#ffbe6b',
-    danger: '#ff7d7d',
-    day: '#ffb86d',
-    dayAccent: '#ff6f3c',
-    dayBall: '#ffe6c2',
-    night: '#173b52',
-    nightAccent: '#4fdcff',
-    nightBall: '#d2f7ff',
-    paddle: '#f6fbff',
-} as const;
-
-export const DIFFICULTY: Record<
-    Difficulty,
-    {
-        label: string;
-        subtitle: string;
-        ballPairs: number;
-        speedMod: number;
-        aiReaction: number;
-        aiAggression: number;
-        aiPrecision: number;
-        wobble: number;
-        pingRange: [number, number];
-    }
-> = {
-    EASY: {
-        label: 'Warmup',
-        subtitle: 'Room to learn the board and ride clean streaks.',
-        ballPairs: 1,
-        speedMod: 0.84,
-        aiReaction: 0.05,
-        aiAggression: 0.28,
-        aiPrecision: 0.76,
-        wobble: 16,
-        pingRange: [52, 74],
-    },
-    MEDIUM: {
-        label: 'Crowd Favorite',
-        subtitle: 'The best balance of readable chaos and swingy endings.',
-        ballPairs: 1,
-        speedMod: 1.02,
-        aiReaction: 0.072,
-        aiAggression: 0.46,
-        aiPrecision: 0.84,
-        wobble: 12,
-        pingRange: [38, 58],
-    },
-    HARD: {
-        label: 'Pressure Test',
-        subtitle: 'Faster rival reads, tighter angles, uglier mistakes.',
-        ballPairs: 2,
-        speedMod: 1.18,
-        aiReaction: 0.096,
-        aiAggression: 0.6,
-        aiPrecision: 0.9,
-        wobble: 8,
-        pingRange: [24, 44],
-    },
-    NIGHTMARE: {
-        label: 'Blackout',
-        subtitle: 'A savage anonymous rival that punishes every lazy return.',
-        ballPairs: 3,
-        speedMod: 1.34,
-        aiReaction: 0.128,
-        aiAggression: 0.76,
-        aiPrecision: 0.95,
-        wobble: 5,
-        pingRange: [14, 32],
-    },
+    page: '#0E1014',
+    day: '#EFE2CC',
+    dayDeep: '#E7D5B5', // subtle radial shading at board edges
+    night: '#1B202B',
+    nightDeep: '#161A23',
+    dayBall: '#E5A13C',
+    dayBallCore: '#FFD795',
+    nightBall: '#8B96F8',
+    nightBallCore: '#C9CFFF',
+    playerPaddle: '#FAF6ED',
+    aiPaddle: '#717CAB',
+    dayText: '#E9C988',
+    nightText: '#9BA5E8',
 };
