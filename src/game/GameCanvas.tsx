@@ -50,6 +50,7 @@ const GameCanvas = ({ mode, daily, onHome }: GameCanvasProps) => {
     const nightPctRef = useRef<HTMLSpanElement>(null);
     const barRef = useRef<HTMLDivElement>(null);
     const streakRef = useRef<HTMLDivElement>(null);
+    const finalShareRef = useRef<HTMLParagraphElement>(null);
 
     const [phase, setPhase] = useState<Phase>('playing');
     const [result, setResult] = useState<MatchResult | null>(null);
@@ -115,6 +116,11 @@ const GameCanvas = ({ mode, daily, onHome }: GameCanvasProps) => {
         setResult(null);
         setEyebrow(null);
         setPhaseBoth('playing');
+
+        // Dev-only escape hatch so automated playtests can stage scenarios.
+        if (import.meta.env.DEV) {
+            (window as unknown as { __engine?: EngineState }).__engine = engineRef.current;
+        }
 
         const observer = new ResizeObserver(() => rendererRef.current?.resize());
         observer.observe(canvas);
@@ -206,7 +212,19 @@ const GameCanvas = ({ mode, daily, onHome }: GameCanvasProps) => {
                 }
                 if (streakRef.current) {
                     const streak = engine.streak;
-                    streakRef.current.textContent = `×${streak}`;
+                    if (streakRef.current.textContent !== `×${streak}`) {
+                        streakRef.current.textContent = `×${streak}`;
+                        // A little pop on every increment keeps the streak alive.
+                        if (streak >= 3) {
+                            streakRef.current.animate(
+                                [
+                                    { transform: 'translateX(-50%) scale(1.3)' },
+                                    { transform: 'translateX(-50%) scale(1)' },
+                                ],
+                                { duration: 200, easing: 'cubic-bezier(0.25, 1, 0.4, 1)' },
+                            );
+                        }
+                    }
                     streakRef.current.classList.toggle('streak-visible', streak >= 3);
                 }
             }
@@ -226,6 +244,28 @@ const GameCanvas = ({ mode, daily, onHome }: GameCanvasProps) => {
     useEffect(() => {
         if (phase !== 'playing') stopEndgameDrone();
     }, [phase]);
+
+    // The final share counts up from 50 while the overlay fades in: the
+    // number arrives the way the territory did, gradually.
+    useEffect(() => {
+        if (phase !== 'over' || !result) return;
+        const el = finalShareRef.current;
+        if (!el) return;
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            el.textContent = `${result.dayShare}%`;
+            return;
+        }
+        const start = performance.now();
+        let raf = 0;
+        const tick = (now: number) => {
+            const p = Math.min((now - start) / 900, 1);
+            const eased = 1 - (1 - p) ** 3;
+            el.textContent = `${Math.round(50 + (result.dayShare - 50) * eased)}%`;
+            if (p < 1) raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(raf);
+    }, [phase, result]);
 
     // Render the share card as soon as there is a result: seeing the artifact
     // is what makes people want to send it.
@@ -459,7 +499,9 @@ const GameCanvas = ({ mode, daily, onHome }: GameCanvasProps) => {
                     <div className="overlay overlay-delayed">
                         {eyebrow && <p className="overlay-eyebrow">{eyebrow}</p>}
                         <p className="overlay-title">{verdict}</p>
-                        <p className={`overlay-share ${result.won ? 'is-day' : 'is-night'}`}>{result.dayShare}%</p>
+                        <p className={`overlay-share ${result.won ? 'is-day' : 'is-night'}`} ref={finalShareRef}>
+                            {result.dayShare}%
+                        </p>
                         <p className="overlay-meta">
                             best streak ×{result.bestStreak} · {result.tilesFlipped} tiles flipped
                         </p>

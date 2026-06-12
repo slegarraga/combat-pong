@@ -96,6 +96,8 @@ export interface EngineState {
     powerUpClock: number;
     /** seconds of widened paddle remaining */
     wideTimer: number;
+    /** captures scheduled by burst/wave gifts, rippling out over time */
+    pendingClaims: { col: number; row: number; delay: number }[];
     /** drained by the orchestrator every frame for sound + fx */
     events: EngineEvent[];
     /** true while the board idles on the home page (two AI paddles, no timer) */

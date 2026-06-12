@@ -109,6 +109,7 @@ export const createEngine = (mode: ModeId, ambient = false, seed?: number): Engi
         powerUp: null,
         powerUpClock: POWERUP_INTERVAL * (0.6 + rng() * 0.5),
         wideTimer: 0,
+        pendingClaims: [],
         events: [],
         ambient,
     };
@@ -324,21 +325,29 @@ const claimTile = (state: EngineState, col: number, row: number) => {
 };
 
 /**
- * A gift was claimed: deliver it. Burst takes the 3x3 around it, wide widens
- * the paddle for a while, wave takes the whole row in one sweep.
+ * A gift was claimed: deliver it, theatrically. Burst blooms outward in two
+ * beats; wave races from the claim point to both edges, tile by tile, its
+ * chimes sweeping the stereo field with it (capture pitch and pan are both
+ * functions of the tile, so the spectacle composes itself). A brief
+ * hit-stop marks the moment the world notices.
  */
 const applyPowerUp = (state: EngineState, kind: PowerUpKind, col: number, row: number) => {
     if (kind === 'burst') {
         for (let r = Math.max(0, row - 1); r <= Math.min(GRID - 1, row + 1); r++) {
             for (let c = Math.max(0, col - 1); c <= Math.min(GRID - 1, col + 1); c++) {
-                claimTile(state, c, r);
+                if (c === col && r === row) continue; // the ball took this one
+                state.pendingClaims.push({ col: c, row: r, delay: 0.07 });
             }
         }
     } else if (kind === 'wide') {
         state.wideTimer = WIDE_DURATION;
     } else {
-        for (let c = 0; c < GRID; c++) claimTile(state, c, row);
+        for (let c = 0; c < GRID; c++) {
+            if (c === col) continue;
+            state.pendingClaims.push({ col: c, row, delay: 0.06 + Math.abs(c - col) * 0.022 });
+        }
     }
+    state.hitStop = Math.max(state.hitStop, 0.07);
     pushEvent(state, {
         type: 'powerup', kind,
         x: col * TILE_SIZE + TILE_SIZE / 2, y: row * TILE_SIZE + TILE_SIZE / 2,
@@ -491,6 +500,18 @@ const step = (state: EngineState, dt: number) => {
         updatePaddle(state.player, dt);
         updateAITarget(state, state.ai, AI_LINE, true, dt);
         updatePowerUps(state, dt);
+
+        // Scheduled gift captures ripple outward as their delays expire.
+        if (state.pendingClaims.length > 0) {
+            for (let i = state.pendingClaims.length - 1; i >= 0; i--) {
+                const claim = state.pendingClaims[i];
+                claim.delay -= dt;
+                if (claim.delay <= 0) {
+                    claimTile(state, claim.col, claim.row);
+                    state.pendingClaims.splice(i, 1);
+                }
+            }
+        }
 
         // The wide gift eases in and out instead of snapping.
         if (state.wideTimer > 0) state.wideTimer -= dt;

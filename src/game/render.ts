@@ -8,7 +8,7 @@
 
 import {
     BOARD_SIZE, TILE_SIZE, GRID, BALL_RADIUS,
-    PADDLE_HEIGHT, PADDLE_MARGIN, POWERUP_TTL, COLORS,
+    PADDLE_HEIGHT, PADDLE_MARGIN, POWERUP_TTL, WIDE_DURATION, COLORS,
 } from './constants';
 import type { Ball, EngineEvent, EngineState, Team } from './types';
 
@@ -42,6 +42,13 @@ interface Ripple {
     color: string;
 }
 
+/** A soft radial wash of light, used when a gift is claimed. */
+interface Flash {
+    x: number;
+    y: number;
+    t: number;
+}
+
 const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
 const easeOutBack = (t: number) => {
     const c1 = 1.4;
@@ -62,6 +69,20 @@ export const createRenderer = (canvas: HTMLCanvasElement): Renderer => {
     const flipLookup = new Map<number, FlipAnim>();
     const particles: Particle[] = [];
     const ripples: Ripple[] = [];
+    const flashes: Flash[] = [];
+
+    // The dawn-glow strip, rendered once and stamped along the frontier.
+    const dawnGlow = document.createElement('canvas');
+    dawnGlow.width = TILE_SIZE;
+    dawnGlow.height = 14;
+    {
+        const g = dawnGlow.getContext('2d')!;
+        const gradient = g.createLinearGradient(0, 14, 0, 0);
+        gradient.addColorStop(0, 'rgba(233, 201, 136, 0.22)');
+        gradient.addColorStop(1, 'rgba(233, 201, 136, 0)');
+        g.fillStyle = gradient;
+        g.fillRect(0, 0, TILE_SIZE, 14);
+    }
 
     const resize = () => {
         const rect = canvas.getBoundingClientRect();
@@ -124,6 +145,7 @@ export const createRenderer = (canvas: HTMLCanvasElement): Renderer => {
                 spawnParticles(e.x, e.y, COLORS.dayBallCore, 18, 220);
                 ripples.push({ x: e.x, y: e.y, t: 0, maxRadius: 70, color: COLORS.dayBall });
                 ripples.push({ x: e.x, y: e.y, t: -0.08, maxRadius: 96, color: COLORS.dayBallCore });
+                flashes.push({ x: e.x, y: e.y, t: 0 });
             }
         }
     };
@@ -172,17 +194,12 @@ export const createRenderer = (canvas: HTMLCanvasElement): Renderer => {
         }
 
         // Dawn at the frontier: warm light bleeds up into the night sky
-        // wherever it touches the cream below.
+        // wherever it touches the cream below (pre-rendered once, stamped
+        // per frontier tile).
         for (let row = 0; row < GRID - 1; row++) {
             for (let col = 0; col < GRID; col++) {
                 if (state.grid[row * GRID + col] === 1 && state.grid[(row + 1) * GRID + col] === 0) {
-                    const x = col * TILE_SIZE;
-                    const yBottom = (row + 1) * TILE_SIZE;
-                    const glow = ctx.createLinearGradient(0, yBottom, 0, yBottom - 14);
-                    glow.addColorStop(0, 'rgba(233, 201, 136, 0.22)');
-                    glow.addColorStop(1, 'rgba(233, 201, 136, 0)');
-                    ctx.fillStyle = glow;
-                    ctx.fillRect(x, yBottom - 14, TILE_SIZE, 14);
+                    ctx.drawImage(dawnGlow, col * TILE_SIZE, (row + 1) * TILE_SIZE - 14, TILE_SIZE, 14);
                 }
             }
         }
@@ -251,6 +268,8 @@ export const createRenderer = (canvas: HTMLCanvasElement): Renderer => {
         const fadeIn = Math.min(gift.age / 0.4, 1);
         const fadeOut = Math.min((POWERUP_TTL - gift.age) / 1.2, 1);
         const pulse = 0.85 + 0.15 * Math.sin(gift.age * 4);
+        // Materialize: arrive large and settle, like something landing softly.
+        const settle = 1 + (1 - easeOutCubic(fadeIn)) * 0.9;
         const alpha = fadeIn * fadeOut;
 
         ctx.save();
@@ -260,7 +279,7 @@ export const createRenderer = (canvas: HTMLCanvasElement): Renderer => {
         ctx.fillRect(-TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE);
 
         ctx.globalAlpha = alpha;
-        ctx.scale(pulse, pulse);
+        ctx.scale(pulse * settle, pulse * settle);
         ctx.strokeStyle = COLORS.dayBall;
         ctx.fillStyle = COLORS.dayBall;
         ctx.lineWidth = 1.8;
@@ -299,6 +318,23 @@ export const createRenderer = (canvas: HTMLCanvasElement): Renderer => {
     };
 
     const drawFx = (dt: number) => {
+        // Gift flashes: a wash of warm light that blooms and dissolves.
+        for (let i = flashes.length - 1; i >= 0; i--) {
+            const f = flashes[i];
+            f.t += dt;
+            const p = f.t / 0.45;
+            if (p >= 1) {
+                flashes.splice(i, 1);
+                continue;
+            }
+            const radius = 60 + 240 * easeOutCubic(p);
+            const glow = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, radius);
+            glow.addColorStop(0, `rgba(255, 215, 149, ${0.22 * (1 - p)})`);
+            glow.addColorStop(1, 'rgba(255, 215, 149, 0)');
+            ctx.fillStyle = glow;
+            ctx.fillRect(0, 0, BOARD_SIZE, BOARD_SIZE);
+        }
+
         for (let i = particles.length - 1; i >= 0; i--) {
             const p = particles[i];
             p.life += dt;
@@ -355,16 +391,44 @@ export const createRenderer = (canvas: HTMLCanvasElement): Renderer => {
 
         for (const ball of state.balls) drawBall(ball);
 
+        // While the wide gift is running, the paddle turns golden and a thin
+        // bar beneath it quietly drains the remaining time.
+        const wideLeft = Math.max(state.wideTimer, 0);
         drawPaddle(
             state.player.x, PLAYER_PADDLE_Y, state.player.width, state.player.stretch,
-            COLORS.playerPaddle, 'rgba(250, 246, 237, 0.55)',
+            wideLeft > 0 ? COLORS.dayBallCore : COLORS.playerPaddle,
+            wideLeft > 0 ? 'rgba(229, 161, 60, 0.8)' : 'rgba(250, 246, 237, 0.55)',
         );
+        if (wideLeft > 0) {
+            const frac = Math.min(wideLeft / WIDE_DURATION, 1);
+            ctx.globalAlpha = Math.min(frac * 3, 0.6);
+            ctx.fillStyle = COLORS.dayBall;
+            roundRect(
+                ctx,
+                state.player.x - (state.player.width / 2) * frac,
+                PLAYER_PADDLE_Y + PADDLE_HEIGHT + 5,
+                state.player.width * frac,
+                3,
+                1.5,
+            );
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
         drawPaddle(
             state.ai.x, AI_PADDLE_Y, state.ai.width, state.ai.stretch,
             COLORS.aiPaddle, 'rgba(113, 124, 171, 0.5)',
         );
 
         drawFx(dt);
+
+        // The last ten seconds sink into sunset: a whisper of warm light
+        // settles over everything as the day runs out.
+        if (!state.ambient && state.status === 'running' && state.timeLeft <= 10) {
+            ctx.globalAlpha = (1 - state.timeLeft / 10) * 0.07;
+            ctx.fillStyle = '#E5A13C';
+            ctx.fillRect(0, 0, BOARD_SIZE, BOARD_SIZE);
+            ctx.globalAlpha = 1;
+        }
     };
 
     resize();
