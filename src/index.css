@@ -151,6 +151,10 @@ button:focus-visible {
     justify-content: center;
     gap: clamp(18px, 3vh, 30px);
     padding: 24px;
+    padding-top: max(24px, env(safe-area-inset-top));
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+    padding-left: max(24px, env(safe-area-inset-left));
+    padding-right: max(24px, env(safe-area-inset-right));
 }
 
 .home-head {
@@ -172,7 +176,7 @@ button:focus-visible {
 }
 
 .home-board {
-    width: min(52vh, 78vw, 440px);
+    width: min(52vh, 86vw, 440px);
 }
 
 .home-actions {
@@ -238,10 +242,14 @@ button:focus-visible {
     justify-content: center;
     gap: 14px;
     padding: 16px;
+    padding-top: max(16px, env(safe-area-inset-top));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
 }
 
 .match-top {
-    width: min(66vh, 92vw, 560px);
+    width: min(66vh, 94vw, 560px);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -275,7 +283,7 @@ button:focus-visible {
 }
 
 .share-row {
-    width: min(66vh, 92vw, 560px);
+    width: min(66vh, 94vw, 560px);
     display: flex;
     align-items: center;
     gap: 12px;
@@ -315,9 +323,10 @@ button:focus-visible {
 
 .board {
     position: relative;
-    width: min(66vh, 92vw, 560px);
+    width: min(66vh, 94vw, 560px);
     touch-action: none;
     cursor: none;
+    -webkit-touch-callout: none;
 }
 
 .streak-chip {
@@ -350,6 +359,26 @@ button:focus-visible {
 
 @media (pointer: coarse) {
     .hint-keys {
+        display: none;
+    }
+
+    /* Touch is the primary input: every target gets a comfortable size. */
+    .ghost-btn {
+        width: 44px;
+        height: 44px;
+    }
+
+    .mode-pill {
+        padding: 10px 18px;
+    }
+
+    .link-btn {
+        padding: 6px 2px;
+    }
+}
+
+@media (pointer: fine) {
+    .hint-touch {
         display: none;
     }
 }

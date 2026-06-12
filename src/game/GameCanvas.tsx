@@ -6,7 +6,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BOARD_SIZE, MATCH_DURATION, type ModeId } from './constants';
+import { BOARD_SIZE, MATCH_DURATION, POINTER_LOCK_SENSITIVITY, type ModeId } from './constants';
 import { advance, createEngine, dayShare, setPlayerTarget } from './engine';
 import { createRenderer, type Renderer } from './render';
 import { isSoundEnabled, playCapture, playEnd, playMiss, playPaddle, setSoundEnabled, unlockAudio } from './audio';
@@ -49,12 +49,32 @@ const GameCanvas = ({ mode, onHome }: GameCanvasProps) => {
         setPhase(next);
     }, []);
 
+    // Capture the mouse on desktop so the cursor can never leave the duel.
+    // Touch devices and unsupported browsers fall back to window tracking.
+    const requestLock = useCallback(() => {
+        const canvas = canvasRef.current;
+        if (!canvas || document.pointerLockElement === canvas) return;
+        if (!window.matchMedia('(pointer: fine)').matches) return;
+        if (!('requestPointerLock' in canvas)) return;
+        try {
+            const res = canvas.requestPointerLock() as unknown as Promise<void> | undefined;
+            res?.catch?.(() => {
+                // denied (e.g. right after Esc) — absolute tracking still works
+            });
+        } catch {
+            // unsupported — absolute tracking still works
+        }
+    }, []);
+    const requestLockRef = useRef(requestLock);
+    requestLockRef.current = requestLock;
+
     const restart = useCallback(() => {
         engineRef.current = createEngine(mode);
         setResult(null);
         setShareState('idle');
         setPhaseBoth('playing');
-    }, [mode, setPhaseBoth]);
+        requestLock();
+    }, [mode, setPhaseBoth, requestLock]);
 
     // Boot engine + renderer + loop
     useEffect(() => {
@@ -140,25 +160,102 @@ const GameCanvas = ({ mode, onHome }: GameCanvasProps) => {
         };
     }, [mode, setPhaseBoth]);
 
-    // Pointer → paddle
+    // Pointer → paddle.
+    //
+    // Mouse-first desktop problem: an absolute cursor walks off the board (or
+    // the window) mid-rally and the paddle dies. Two layers fix it:
+    //   1. Tracking lives on `window`, not the board, so the paddle follows
+    //      the cursor anywhere on screen, clamped to the board.
+    //   2. Clicking the board engages the Pointer Lock API: from then on the
+    //      mouse is captured and movement is relative, so there is no edge,
+    //      no focus loss, nothing to fall off of. Esc releases and pauses.
+    // Touch is the primary input overall: absolute, drag anywhere, primary
+    // pointer only (a resting second finger must never yank the paddle).
     useEffect(() => {
+        const canvas = canvasRef.current!;
         const board = boardRef.current!;
-        const handlePointer = (e: PointerEvent) => {
-            const rect = board.getBoundingClientRect();
-            const x = ((e.clientX - rect.left) / rect.width) * BOARD_SIZE;
-            if (engineRef.current) setPlayerTarget(engineRef.current, x);
+        let rect = board.getBoundingClientRect();
+        let virtualX: number | null = null;
+        let wasLocked = false;
+
+        const refreshRect = () => {
+            rect = board.getBoundingClientRect();
         };
+        const observer = new ResizeObserver(refreshRect);
+        observer.observe(board);
+
+        const isLocked = () => document.pointerLockElement === canvas;
+
+        const absoluteMove = (e: PointerEvent) => {
+            if (!e.isPrimary || isLocked()) return;
+            const engine = engineRef.current;
+            if (!engine) return;
+            setPlayerTarget(engine, ((e.clientX - rect.left) / rect.width) * BOARD_SIZE);
+        };
+
+        // Pointer Lock deltas ride on mousemove (the most reliable carrier of
+        // movementX across browsers).
+        const relativeMove = (e: MouseEvent) => {
+            if (!isLocked()) return;
+            const engine = engineRef.current;
+            if (!engine) return;
+            const gain = (BOARD_SIZE / rect.width) * POINTER_LOCK_SENSITIVITY;
+            const base = virtualX ?? engine.player.targetX;
+            virtualX = Math.max(0, Math.min(BOARD_SIZE, base + e.movementX * gain));
+            setPlayerTarget(engine, virtualX);
+        };
+
         const handleDown = (e: PointerEvent) => {
             unlockAudio();
-            handlePointer(e);
+            absoluteMove(e);
+            if (e.pointerType === 'mouse' && phaseRef.current === 'playing') requestLockRef.current();
         };
-        board.addEventListener('pointermove', handlePointer);
+
+        const handleLockChange = () => {
+            const locked = isLocked();
+            if (locked) {
+                // Continue from wherever the paddle is — no jump on entry.
+                virtualX = engineRef.current?.player.targetX ?? null;
+            } else if (wasLocked && phaseRef.current === 'playing') {
+                // Lock can only vanish mid-match via Esc (the browser swallows
+                // the keydown), so treat it as the pause gesture it was.
+                setPhaseBoth('paused');
+            }
+            wasLocked = locked;
+        };
+
+        const blockMenu = (e: Event) => e.preventDefault();
+
+        window.addEventListener('pointermove', absoluteMove);
+        window.addEventListener('mousemove', relativeMove);
         board.addEventListener('pointerdown', handleDown);
+        board.addEventListener('contextmenu', blockMenu);
+        document.addEventListener('pointerlockchange', handleLockChange);
         return () => {
-            board.removeEventListener('pointermove', handlePointer);
+            observer.disconnect();
+            window.removeEventListener('pointermove', absoluteMove);
+            window.removeEventListener('mousemove', relativeMove);
             board.removeEventListener('pointerdown', handleDown);
+            board.removeEventListener('contextmenu', blockMenu);
+            document.removeEventListener('pointerlockchange', handleLockChange);
+            if (isLocked()) document.exitPointerLock();
         };
-    }, []);
+    }, [setPhaseBoth]);
+
+    // Lock is only meaningful while playing; give the cursor back to overlays.
+    useEffect(() => {
+        if (phase !== 'playing' && document.pointerLockElement) document.exitPointerLock();
+    }, [phase]);
+
+    // Leaving the tab mid-rally parks the match on the pause screen, so
+    // coming back is calm instead of an instant ball to the face.
+    useEffect(() => {
+        const onVisibility = () => {
+            if (document.hidden && phaseRef.current === 'playing') setPhaseBoth('paused');
+        };
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => document.removeEventListener('visibilitychange', onVisibility);
+    }, [setPhaseBoth]);
 
     // Keyboard
     useEffect(() => {
@@ -238,7 +335,13 @@ const GameCanvas = ({ mode, onHome }: GameCanvasProps) => {
                     <div className="overlay">
                         <p className="overlay-title">Paused</p>
                         <div className="overlay-actions">
-                            <button className="btn btn-primary" onClick={() => setPhaseBoth('playing')}>
+                            <button
+                                className="btn btn-primary"
+                                onClick={() => {
+                                    setPhaseBoth('playing');
+                                    requestLock();
+                                }}
+                            >
                                 Resume
                             </button>
                             <button className="btn" onClick={restart}>
@@ -274,8 +377,8 @@ const GameCanvas = ({ mode, onHome }: GameCanvasProps) => {
             </div>
 
             <p className="match-hint">
-                move to defend the cream
-                <span className="hint-keys"> · esc pause · m sound</span>
+                <span className="hint-touch">drag anywhere to defend the cream</span>
+                <span className="hint-keys">move to defend the cream · click locks your mouse · esc pause</span>
             </p>
         </div>
     );

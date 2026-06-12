@@ -38,6 +38,7 @@ export const PADDLE_WIDTH = 110;
 export const PADDLE_HEIGHT = 13;
 export const PADDLE_MARGIN = 30; // gap between paddle and its wall
 export const PADDLE_SMOOTHING = 0.03; // pointer-follow time constant (s); lower = snappier
+export const POINTER_LOCK_SENSITIVITY = 1.05; // relative mouse gain while locked
 export const SLICE_FACTOR = 0.22; // how much paddle velocity bends the ball
 export const BOUNCE_ANGLE_MAX = (55 * Math.PI) / 180; // edge-hit deflection
 

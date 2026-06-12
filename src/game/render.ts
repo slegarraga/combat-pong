@@ -65,7 +65,7 @@ export const createRenderer = (canvas: HTMLCanvasElement): Renderer => {
 
     const resize = () => {
         const rect = canvas.getBoundingClientRect();
-        const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
         const px = Math.max(1, Math.round(rect.width * dpr));
         if (canvas.width !== px) {
             canvas.width = px;
