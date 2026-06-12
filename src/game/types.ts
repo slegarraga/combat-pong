@@ -37,7 +37,19 @@ export interface Paddle {
 
 export type EngineEvent =
     | { type: 'capture'; team: Team; col: number; row: number; x: number; y: number }
-    | { type: 'paddle'; side: 'player' | 'ai'; ballTeam: Team; x: number; y: number; speed: number; streak: number }
+    | {
+          type: 'paddle';
+          side: 'player' | 'ai';
+          ballTeam: Team;
+          x: number;
+          y: number;
+          speed: number;
+          streak: number;
+          /** paddle was moving fast at contact: extra weight everywhere */
+          slam: boolean;
+          /** contact on the outer edge of the paddle: a save by inches */
+          edge: boolean;
+      }
     | { type: 'miss'; side: 'player' | 'ai'; x: number }
     | { type: 'wall'; x: number; y: number }
     | { type: 'over'; winner: Team | 'draw' };
@@ -62,6 +74,12 @@ export interface EngineState {
     tilesFlipped: number;
     /** seconds of impact freeze remaining */
     hitStop: number;
+    /** fixed-timestep accumulator, carried across frames */
+    acc: number;
+    /** seconds since the last (re)start, drives the slow-motion ease-in */
+    ramp: number;
+    /** randomness source: Math.random normally, seeded for the daily duel */
+    rng: () => number;
     /** drained by the orchestrator every frame for sound + fx */
     events: EngineEvent[];
     /** true while the board idles on the home page (two AI paddles, no timer) */
@@ -76,4 +94,6 @@ export interface MatchResult {
     tilesFlipped: number;
     mode: ModeId;
     grid: Uint8Array;
+    /** set when this was a Daily Duel: the day number */
+    daily?: number;
 }

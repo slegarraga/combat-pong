@@ -108,12 +108,13 @@ export const createRenderer = (canvas: HTMLCanvasElement): Renderer => {
                 spawnParticles(e.x, e.y, color, 4, 70);
             } else if (e.type === 'paddle') {
                 const color = e.side === 'player' ? COLORS.dayBall : COLORS.nightBall;
-                spawnParticles(e.x, e.y, color, 8, 130);
+                spawnParticles(e.x, e.y, color, e.slam ? 14 : 8, e.slam ? 190 : 130);
+                if (e.edge) spawnParticles(e.x, e.y, '#FFF6E4', 5, 230);
                 ripples.push({
                     x: e.x,
                     y: e.y,
                     t: 0,
-                    maxRadius: 30 + Math.min(e.streak * 1.5, 18),
+                    maxRadius: (e.slam ? 46 : 30) + Math.min(e.streak * 1.5, 18),
                     color,
                 });
             } else if (e.type === 'miss' && e.side === 'player') {
@@ -215,6 +216,9 @@ export const createRenderer = (canvas: HTMLCanvasElement): Renderer => {
         ctx.save();
         ctx.translate(ball.x, ball.y);
         if (ball.squash > 0.02) {
+            // Compress along the bounce axis, stretch along the other:
+            // chewy contact on paddles, tiles and walls alike.
+            ctx.rotate(ball.squashAngle);
             ctx.scale(1 + 0.3 * ball.squash, 1 - 0.26 * ball.squash);
         }
         ctx.shadowColor = color;

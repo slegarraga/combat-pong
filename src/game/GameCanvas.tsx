@@ -2,16 +2,25 @@
  * The match screen. Owns the rAF loop and wires engine → renderer → audio.
  *
  * HUD numbers are written straight to the DOM (no re-renders at 60fps);
- * React state only changes on phase transitions (playing / paused / over).
+ * React state only changes on phase transitions (playing / paused / over)
+ * and around the share lightbox, where the player views their result card
+ * full-size and picks how to take it with them (share / copy / download).
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BOARD_SIZE, MATCH_DURATION, POINTER_LOCK_SENSITIVITY, type ModeId } from './constants';
-import { advance, createEngine, dayShare, setPlayerTarget } from './engine';
+import { advance, createEngine, dayShare, setPlayerTarget, softResume } from './engine';
 import { createRenderer, type Renderer } from './render';
-import { isSoundEnabled, playCapture, playEnd, playMiss, playPaddle, setSoundEnabled, unlockAudio } from './audio';
-import { recordMatch } from './PlayerStats';
-import { shareResult } from './ShareCard';
+import {
+    isSoundEnabled, playCapture, playEnd, playMiss, playPaddle, playWall,
+    setSoundEnabled, startEndgameDrone, stopEndgameDrone, unlockAudio,
+} from './audio';
+import { getStats, recordMatch } from './PlayerStats';
+import { dailySeed, saveDailyRecord } from './daily';
+import {
+    canCopyImage, canNativeShare, copyCardImage, copyShareText, downloadCard,
+    generateShareCard, nativeShareCard,
+} from './ShareCard';
 import type { EngineState, MatchResult } from './types';
 
 type Phase = 'playing' | 'paused' | 'over';
@@ -23,10 +32,12 @@ const formatClock = (seconds: number) => {
 
 interface GameCanvasProps {
     mode: ModeId;
+    /** when set, this match is the Daily Duel for that day number */
+    daily?: number;
     onHome: () => void;
 }
 
-const GameCanvas = ({ mode, onHome }: GameCanvasProps) => {
+const GameCanvas = ({ mode, daily, onHome }: GameCanvasProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const boardRef = useRef<HTMLDivElement>(null);
     const engineRef = useRef<EngineState>();
@@ -41,13 +52,23 @@ const GameCanvas = ({ mode, onHome }: GameCanvasProps) => {
 
     const [phase, setPhase] = useState<Phase>('playing');
     const [result, setResult] = useState<MatchResult | null>(null);
+    const [eyebrow, setEyebrow] = useState<string | null>(null);
+    const [cardUrl, setCardUrl] = useState<string | null>(null);
+    const cardBlobRef = useRef<Blob | null>(null);
     const [soundOn, setSoundOn] = useState(isSoundEnabled);
-    const [shareState, setShareState] = useState<'idle' | 'busy' | 'done'>('idle');
+    const [lightboxOpen, setLightboxOpen] = useState(false);
+    const [shareFeedback, setShareFeedback] = useState<'shared' | 'copied' | 'copiedText' | 'saved' | null>(null);
 
     const setPhaseBoth = useCallback((next: Phase) => {
         phaseRef.current = next;
         setPhase(next);
     }, []);
+
+    /** The Daily Duel always plays the classic recipe with the day's seed. */
+    const buildEngine = useCallback(
+        () => (daily === undefined ? createEngine(mode) : createEngine('classic', false, dailySeed(daily))),
+        [mode, daily],
+    );
 
     // Capture the mouse on desktop so the cursor can never leave the duel.
     // Touch devices and unsupported browsers fall back to window tracking.
@@ -69,19 +90,29 @@ const GameCanvas = ({ mode, onHome }: GameCanvasProps) => {
     requestLockRef.current = requestLock;
 
     const restart = useCallback(() => {
-        engineRef.current = createEngine(mode);
+        engineRef.current = buildEngine();
         setResult(null);
-        setShareState('idle');
+        setEyebrow(null);
+        setLightboxOpen(false);
+        setShareFeedback(null);
         setPhaseBoth('playing');
         requestLock();
-    }, [mode, setPhaseBoth, requestLock]);
+    }, [buildEngine, setPhaseBoth, requestLock]);
+
+    /** Every way back into play goes through here: slow-motion + mouse lock. */
+    const resume = useCallback(() => {
+        if (engineRef.current) softResume(engineRef.current);
+        setPhaseBoth('playing');
+        requestLock();
+    }, [setPhaseBoth, requestLock]);
 
     // Boot engine + renderer + loop
     useEffect(() => {
         const canvas = canvasRef.current!;
-        engineRef.current = createEngine(mode);
+        engineRef.current = buildEngine();
         rendererRef.current = createRenderer(canvas);
         setResult(null);
+        setEyebrow(null);
         setPhaseBoth('playing');
 
         const observer = new ResizeObserver(() => rendererRef.current?.resize());
@@ -91,6 +122,7 @@ const GameCanvas = ({ mode, onHome }: GameCanvasProps) => {
         let last = performance.now();
         let lastClock = '';
         let lastShare = -1;
+        let droneOn = false;
 
         const frame = (now: number) => {
             raf = requestAnimationFrame(frame);
@@ -102,25 +134,51 @@ const GameCanvas = ({ mode, onHome }: GameCanvasProps) => {
             if (phaseRef.current === 'playing') {
                 advance(engine, dt);
 
+                // The last ten seconds get a quiet pad under them.
+                if (!droneOn && engine.timeLeft <= 10 && engine.timeLeft > 0.5) {
+                    droneOn = true;
+                    startEndgameDrone();
+                } else if (droneOn && engine.timeLeft > 10) {
+                    droneOn = false; // a restart reset the clock
+                }
+
                 const events = engine.events;
                 if (events.length > 0) {
                     renderer.ingest(events);
                     for (const e of events) {
-                        if (e.type === 'capture') playCapture(e.team, e.row);
+                        if (e.type === 'capture') playCapture(e.team, e.row, e.col);
                         else if (e.type === 'paddle') {
-                            playPaddle(e.side, e.streak, (e.side === 'player') === (e.ballTeam === 'day'));
-                        } else if (e.type === 'miss') playMiss(e.side);
+                            const own = (e.side === 'player') === (e.ballTeam === 'day');
+                            playPaddle(e.side, e.streak, own, e.x, e.speed, e.slam);
+                        } else if (e.type === 'miss') playMiss(e.side, e.x);
+                        else if (e.type === 'wall') playWall(e.x);
                         else if (e.type === 'over') {
+                            droneOn = false;
                             const final: MatchResult = {
                                 won: e.winner === 'day',
                                 draw: e.winner === 'draw',
                                 dayShare: dayShare(engine),
                                 bestStreak: engine.bestStreak,
                                 tilesFlipped: engine.tilesFlipped,
-                                mode,
+                                mode: daily === undefined ? mode : 'classic',
                                 grid: engine.grid.slice(),
+                                daily,
                             };
+                            // "New best" is measured against your career so far.
+                            const before = getStats();
                             recordMatch(final);
+                            if (daily !== undefined) {
+                                const record = saveDailyRecord(daily, final);
+                                setEyebrow(
+                                    record.streakDays >= 2
+                                        ? `Daily Duel #${daily} · day streak ${record.streakDays}`
+                                        : `Daily Duel #${daily}`,
+                                );
+                            } else if (before.games > 0 && final.dayShare > before.bestShare) {
+                                setEyebrow('New best board');
+                            } else if (before.games > 0 && final.bestStreak > before.bestStreak) {
+                                setEyebrow(`New best streak ×${final.bestStreak}`);
+                            }
                             playEnd(final.draw ? 'draw' : final.won ? 'win' : 'loss');
                             setResult(final);
                             setPhaseBoth('over');
@@ -157,8 +215,36 @@ const GameCanvas = ({ mode, onHome }: GameCanvasProps) => {
         return () => {
             cancelAnimationFrame(raf);
             observer.disconnect();
+            stopEndgameDrone();
         };
-    }, [mode, setPhaseBoth]);
+    }, [mode, daily, buildEngine, setPhaseBoth]);
+
+    // Pausing or finishing silences the endgame pad immediately.
+    useEffect(() => {
+        if (phase !== 'playing') stopEndgameDrone();
+    }, [phase]);
+
+    // Render the share card as soon as there is a result: seeing the artifact
+    // is what makes people want to send it.
+    useEffect(() => {
+        if (!result) {
+            setCardUrl(null);
+            cardBlobRef.current = null;
+            return;
+        }
+        let url: string | null = null;
+        let cancelled = false;
+        void generateShareCard(result).then((blob) => {
+            if (cancelled) return;
+            cardBlobRef.current = blob;
+            url = URL.createObjectURL(blob);
+            setCardUrl(url);
+        });
+        return () => {
+            cancelled = true;
+            if (url) URL.revokeObjectURL(url);
+        };
+    }, [result]);
 
     // Pointer → paddle.
     //
@@ -261,21 +347,22 @@ const GameCanvas = ({ mode, onHome }: GameCanvasProps) => {
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
-                if (phaseRef.current === 'playing') setPhaseBoth('paused');
-                else if (phaseRef.current === 'paused') setPhaseBoth('playing');
+                if (lightboxOpen) setLightboxOpen(false);
+                else if (phaseRef.current === 'playing') setPhaseBoth('paused');
+                else if (phaseRef.current === 'paused') resume();
             } else if (e.key === 'm' || e.key === 'M') {
                 const next = !isSoundEnabled();
                 setSoundEnabled(next);
                 setSoundOn(next);
                 if (next) unlockAudio();
-            } else if ((e.key === 'Enter' || e.key === ' ') && phaseRef.current === 'over') {
+            } else if ((e.key === 'Enter' || e.key === ' ') && phaseRef.current === 'over' && !lightboxOpen) {
                 e.preventDefault();
                 restart();
             }
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [restart, setPhaseBoth]);
+    }, [restart, resume, setPhaseBoth, lightboxOpen]);
 
     const toggleSound = () => {
         const next = !isSoundEnabled();
@@ -284,15 +371,32 @@ const GameCanvas = ({ mode, onHome }: GameCanvasProps) => {
         if (next) unlockAudio();
     };
 
-    const handleShare = async () => {
-        if (!result || shareState === 'busy') return;
-        setShareState('busy');
-        try {
-            await shareResult(result);
-            setShareState('done');
-        } catch {
-            setShareState('idle');
-        }
+    // The share hub: every entry point (card click, Share button) opens the
+    // lightbox, where the user picks how to take the card with them.
+    const openLightbox = () => {
+        setShareFeedback(null);
+        setLightboxOpen(true);
+    };
+
+    const handleNativeShare = async () => {
+        if (!result || !cardBlobRef.current) return;
+        if (await nativeShareCard(result, cardBlobRef.current)) setShareFeedback('shared');
+    };
+
+    const handleCopy = async () => {
+        if (!cardBlobRef.current) return;
+        if (await copyCardImage(cardBlobRef.current)) setShareFeedback('copied');
+    };
+
+    const handleCopyText = async () => {
+        if (!result) return;
+        if (await copyShareText(result)) setShareFeedback('copiedText');
+    };
+
+    const handleDownload = () => {
+        if (!cardBlobRef.current) return;
+        downloadCard(cardBlobRef.current);
+        setShareFeedback('saved');
     };
 
     const verdict = result ? (result.draw ? 'Dead even.' : result.won ? 'You took the board.' : 'The night held it.') : '';
@@ -309,7 +413,7 @@ const GameCanvas = ({ mode, onHome }: GameCanvasProps) => {
                     aria-label="Pause"
                     onClick={() => {
                         if (phaseRef.current === 'playing') setPhaseBoth('paused');
-                        else if (phaseRef.current === 'paused') setPhaseBoth('playing');
+                        else if (phaseRef.current === 'paused') resume();
                     }}
                 >
                     {formatClock(MATCH_DURATION)}
@@ -335,13 +439,7 @@ const GameCanvas = ({ mode, onHome }: GameCanvasProps) => {
                     <div className="overlay">
                         <p className="overlay-title">Paused</p>
                         <div className="overlay-actions">
-                            <button
-                                className="btn btn-primary"
-                                onClick={() => {
-                                    setPhaseBoth('playing');
-                                    requestLock();
-                                }}
-                            >
+                            <button className="btn btn-primary" onClick={resume}>
                                 Resume
                             </button>
                             <button className="btn" onClick={restart}>
@@ -355,18 +453,24 @@ const GameCanvas = ({ mode, onHome }: GameCanvasProps) => {
                 )}
 
                 {phase === 'over' && result && (
-                    <div className="overlay">
+                    <div className="overlay overlay-delayed">
+                        {eyebrow && <p className="overlay-eyebrow">{eyebrow}</p>}
                         <p className="overlay-title">{verdict}</p>
                         <p className={`overlay-share ${result.won ? 'is-day' : 'is-night'}`}>{result.dayShare}%</p>
                         <p className="overlay-meta">
                             best streak ×{result.bestStreak} · {result.tilesFlipped} tiles flipped
                         </p>
+                        {cardUrl && (
+                            <button className="result-card" onClick={openLightbox} aria-label="View and share your result card">
+                                <img src={cardUrl} alt={`Result card: ${result.dayShare}% of the board`} />
+                            </button>
+                        )}
                         <div className="overlay-actions">
                             <button className="btn btn-primary" onClick={restart}>
                                 Play again
                             </button>
-                            <button className="btn" onClick={handleShare} disabled={shareState === 'busy'}>
-                                {shareState === 'done' ? 'Shared ✓' : 'Share'}
+                            <button className="btn" onClick={openLightbox}>
+                                Share
                             </button>
                         </div>
                         <button className="link-btn" onClick={onHome}>
@@ -375,6 +479,46 @@ const GameCanvas = ({ mode, onHome }: GameCanvasProps) => {
                     </div>
                 )}
             </div>
+
+            {lightboxOpen && result && cardUrl && (
+                <div
+                    className="lightbox"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Share your result card"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setLightboxOpen(false);
+                    }}
+                >
+                    <img className="lightbox-img" src={cardUrl} alt={`Result card: ${result.dayShare}% of the board`} />
+                    <div className="overlay-actions">
+                        {canNativeShare() && (
+                            <button className="btn btn-primary" onClick={handleNativeShare}>
+                                {shareFeedback === 'shared' ? 'Shared ✓' : 'Share'}
+                            </button>
+                        )}
+                        {result.daily !== undefined && (
+                            <button className={`btn ${canNativeShare() ? '' : 'btn-primary'}`} onClick={handleCopyText}>
+                                {shareFeedback === 'copiedText' ? 'Copied ✓' : 'Copy text'}
+                            </button>
+                        )}
+                        {canCopyImage() && (
+                            <button
+                                className={`btn ${!canNativeShare() && result.daily === undefined ? 'btn-primary' : ''}`}
+                                onClick={handleCopy}
+                            >
+                                {shareFeedback === 'copied' ? 'Copied ✓' : 'Copy image'}
+                            </button>
+                        )}
+                        <button className="btn" onClick={handleDownload}>
+                            {shareFeedback === 'saved' ? 'Saved ✓' : 'Download'}
+                        </button>
+                    </div>
+                    <button className="link-btn" onClick={() => setLightboxOpen(false)}>
+                        close
+                    </button>
+                </div>
+            )}
 
             <p className="match-hint">
                 <span className="hint-touch">drag anywhere to defend the cream</span>

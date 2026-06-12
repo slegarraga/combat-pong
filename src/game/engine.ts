@@ -14,12 +14,14 @@
  */
 
 import {
-    BOARD_SIZE, TILE_SIZE, GRID, SIM_STEP, MATCH_DURATION, HIT_STOP,
+    BOARD_SIZE, TILE_SIZE, GRID, SIM_STEP, MATCH_DURATION,
+    HIT_STOP_MIN, HIT_STOP_SPEED, HIT_STOP_SLAM, RAMP_DURATION, RAMP_FLOOR,
     BALL_RADIUS, BASE_SPEED, MAX_SPEED, STREAK_SPEED_CAP, SPEED_KICK,
     SPEED_KICK_FLAT, ENEMY_DAMPEN, AI_ENEMY_DAMPEN, AI_SPEED_KICK, MISS_SLOWDOWN, JITTER,
     MIN_VY_FRACTION, MIN_VX_FRACTION,
     PADDLE_WIDTH, PADDLE_HEIGHT, PADDLE_MARGIN, PADDLE_SMOOTHING,
-    SLICE_FACTOR, BOUNCE_ANGLE_MAX,
+    SLICE_FACTOR, SLICE_PADDLE_V_MAX, SLAM_PADDLE_SPEED,
+    BOUNCE_ANGLE_MAX, TOTAL_ANGLE_MAX, EDGE_HIT_THRESHOLD,
     MODES, type ModeId,
 } from './constants';
 import type { Ball, EngineState, Paddle, Team } from './types';
@@ -40,25 +42,38 @@ const makePaddle = (): Paddle => ({
     stretch: 0,
 });
 
-const spawnBall = (team: Team, index: number, speed: number): Ball => {
-    // Day balls rise into the night; night balls sink into the day.
-    const dir = team === 'day' ? -1 : 1;
-    const lane = 0.3 + 0.4 * Math.random() + index * 0.07;
-    const angle = (Math.random() * 50 - 25) * (Math.PI / 180);
+/** Deterministic RNG for the daily duel; everyone faces the same serves. */
+export const mulberry32 = (seed: number) => {
+    let a = seed >>> 0;
+    return () => {
+        a |= 0;
+        a = (a + 0x6d2b79f5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+};
+
+const spawnBall = (team: Team, index: number, speed: number, rng: () => number): Ball => {
+    // Both balls open by rising away from the player: your amber ball starts
+    // attacking immediately, the night ball detours before its first dive.
+    const lane = 0.3 + 0.4 * rng() + index * 0.07;
+    const angle = (rng() * 50 - 25) * (Math.PI / 180);
     return {
         team,
         x: BOARD_SIZE * Math.min(lane, 0.72),
         y: team === 'day' ? BOARD_SIZE * 0.7 : BOARD_SIZE * 0.3,
         vx: speed * Math.sin(angle),
-        vy: speed * Math.cos(angle) * dir,
+        vy: -speed * Math.cos(angle),
         squash: 0,
         squashAngle: 0,
         trail: [],
     };
 };
 
-export const createEngine = (mode: ModeId, ambient = false): EngineState => {
+export const createEngine = (mode: ModeId, ambient = false, seed?: number): EngineState => {
     const cfg = MODES[mode];
+    const rng = seed === undefined ? Math.random : mulberry32(seed);
     const grid = new Uint8Array(GRID * GRID);
     for (let row = 0; row < GRID; row++) {
         for (let col = 0; col < GRID; col++) {
@@ -68,8 +83,8 @@ export const createEngine = (mode: ModeId, ambient = false): EngineState => {
     const speed = BASE_SPEED * cfg.speed * (ambient ? 0.62 : 1);
     const balls: Ball[] = [];
     for (let i = 0; i < cfg.pairs; i++) {
-        balls.push(spawnBall('day', i, speed));
-        balls.push(spawnBall('night', i, speed));
+        balls.push(spawnBall('day', i, speed, rng));
+        balls.push(spawnBall('night', i, speed, rng));
     }
     return {
         mode,
@@ -86,9 +101,21 @@ export const createEngine = (mode: ModeId, ambient = false): EngineState => {
         bestStreak: 0,
         tilesFlipped: 0,
         hitStop: 0,
+        acc: 0,
+        ramp: 0,
+        rng,
         events: [],
         ambient,
     };
+};
+
+/**
+ * Restart the slow-motion ease-in. Called when a match begins and whenever
+ * play resumes from pause, so nobody ever takes a full-speed ball to the
+ * face on their first frame back.
+ */
+export const softResume = (state: EngineState) => {
+    state.ramp = 0;
 };
 
 /** Point the player paddle at a board-space x. Call from pointer handlers. */
@@ -176,13 +203,17 @@ const collidePaddle = (
         : ball.y - BALL_RADIUS <= surface && ball.y + BALL_RADIUS >= surface - PADDLE_HEIGHT;
     if (!crossed) return;
 
+    // Generous edge: a ball that grazes the paddle's corner still counts.
+    // Saves by inches are the best feeling in the game; never steal them.
     const half = paddle.width / 2;
-    if (ball.x < paddle.x - half - BALL_RADIUS * 0.6 || ball.x > paddle.x + half + BALL_RADIUS * 0.6) return;
+    if (ball.x < paddle.x - half - BALL_RADIUS * 0.95 || ball.x > paddle.x + half + BALL_RADIUS * 0.95) return;
 
     // Resolve out of the paddle, then redirect by hit point + slice.
     ball.y = movingDown ? surface - BALL_RADIUS : surface + BALL_RADIUS;
     const u = clamp((ball.x - paddle.x) / half, -1, 1);
     const angle = u * BOUNCE_ANGLE_MAX;
+    const edge = Math.abs(u) > EDGE_HIT_THRESHOLD;
+    const slam = side === 'player' && Math.abs(paddle.vx) > SLAM_PADDLE_SPEED;
 
     // Offense and defense in one motion: slamming your own ball sends it off
     // faster; meeting an enemy ball cushions it so it limps back home.
@@ -194,34 +225,62 @@ const collidePaddle = (
         state.streak += 1;
         state.bestStreak = Math.max(state.bestStreak, state.streak);
         speed = ownBall
-            ? Math.min(speed * SPEED_KICK + SPEED_KICK_FLAT, streakCap(state))
-            : Math.max(speed * ENEMY_DAMPEN, floor);
+            ? Math.min(speed * SPEED_KICK * (slam ? 1.07 : 1) + SPEED_KICK_FLAT, streakCap(state))
+            : Math.max(speed * ENEMY_DAMPEN * (slam ? 0.95 : 1), floor);
     } else {
         speed = ownBall
             ? Math.min(speed * AI_SPEED_KICK, streakCap(state) * ambientScale)
             : Math.max(speed * AI_ENEMY_DAMPEN, floor);
     }
 
+    // Slice: paddle motion bends the return, clamped so a violent mouse
+    // flick can never produce a degenerate near-horizontal ball.
+    const slice = clamp(paddle.vx, -SLICE_PADDLE_V_MAX, SLICE_PADDLE_V_MAX) * SLICE_FACTOR;
     const dir = movingDown ? -1 : 1;
-    ball.vx = speed * Math.sin(angle) + paddle.vx * SLICE_FACTOR;
-    ball.vy = speed * Math.cos(angle) * dir;
+    let vx = speed * Math.sin(angle) + slice;
+    let vy = speed * Math.cos(angle) * dir;
+    const outgoing = Math.atan2(Math.abs(vx), Math.abs(vy));
+    if (outgoing > TOTAL_ANGLE_MAX) {
+        const total = Math.hypot(vx, vy);
+        vx = Math.sign(vx) * total * Math.sin(TOTAL_ANGLE_MAX);
+        vy = Math.sign(vy) * total * Math.cos(TOTAL_ANGLE_MAX);
+    }
+    ball.vx = vx;
+    ball.vy = vy;
 
+    // Impact weight scales with how hard the contact was.
     ball.squash = 1;
-    ball.squashAngle = Math.PI / 2;
+    ball.squashAngle = 0;
     paddle.stretch = 1;
-    if (!state.ambient) state.hitStop = HIT_STOP;
+    if (!state.ambient) {
+        const speedWeight = Math.min(speed / 900, 1) * HIT_STOP_SPEED;
+        state.hitStop = HIT_STOP_MIN + speedWeight + (slam ? HIT_STOP_SLAM : 0);
+    }
 
-    pushEvent(state, { type: 'paddle', side, ballTeam: ball.team, x: ball.x, y: ball.y, speed, streak: state.streak });
+    pushEvent(state, {
+        type: 'paddle', side, ballTeam: ball.team,
+        x: ball.x, y: ball.y, speed, streak: state.streak, slam, edge,
+    });
+};
+
+/** Squash the ball along a bounce axis: 0 = vertical hit, π/2 = horizontal. */
+const squashBall = (ball: Ball, axis: number, amount: number) => {
+    if (ball.squash < amount) {
+        ball.squash = amount;
+        ball.squashAngle = axis;
+    }
 };
 
 const collideWalls = (state: EngineState, ball: Ball) => {
     if (ball.x - BALL_RADIUS < 0 && ball.vx < 0) {
         ball.x = BALL_RADIUS;
         ball.vx = -ball.vx;
+        squashBall(ball, Math.PI / 2, 0.4);
         pushEvent(state, { type: 'wall', x: ball.x, y: ball.y });
     } else if (ball.x + BALL_RADIUS > BOARD_SIZE && ball.vx > 0) {
         ball.x = BOARD_SIZE - BALL_RADIUS;
         ball.vx = -ball.vx;
+        squashBall(ball, Math.PI / 2, 0.4);
         pushEvent(state, { type: 'wall', x: ball.x, y: ball.y });
     }
 
@@ -230,6 +289,7 @@ const collideWalls = (state: EngineState, ball: Ball) => {
         ball.y = BOARD_SIZE - BALL_RADIUS;
         ball.vy = -ball.vy;
         setSpeed(ball, speedOf(ball) * MISS_SLOWDOWN);
+        squashBall(ball, 0, 0.5);
         if (!state.ambient) {
             state.streak = 0;
             pushEvent(state, { type: 'miss', side: 'player', x: ball.x });
@@ -238,6 +298,7 @@ const collideWalls = (state: EngineState, ball: Ball) => {
         ball.y = BALL_RADIUS;
         ball.vy = -ball.vy;
         setSpeed(ball, speedOf(ball) * MISS_SLOWDOWN);
+        squashBall(ball, 0, 0.5);
         if (!state.ambient) pushEvent(state, { type: 'miss', side: 'ai', x: ball.x });
     }
 };
@@ -281,18 +342,21 @@ const collideTiles = (state: EngineState, ball: Ball) => {
         state.nightTiles += 1;
     }
 
-    // Reflect off the captured tile along the axis of deepest penetration.
+    // Reflect off the captured tile along the axis of deepest penetration,
+    // with a touch of squash so every chomp reads as contact.
     const cx = hitCol * TILE_SIZE + TILE_SIZE / 2;
     const cy = hitRow * TILE_SIZE + TILE_SIZE / 2;
     const dx = ball.x - cx;
     const dy = ball.y - cy;
     if (Math.abs(dx) > Math.abs(dy)) {
         ball.vx = Math.sign(dx || 1) * Math.abs(ball.vx);
+        squashBall(ball, Math.PI / 2, 0.35);
     } else {
         ball.vy = Math.sign(dy || 1) * Math.abs(ball.vy);
+        squashBall(ball, 0, 0.35);
     }
     // Organic micro-rotation so the frontier never settles into a loop.
-    const jitter = (Math.random() - 0.5) * 0.06;
+    const jitter = (state.rng() - 0.5) * 0.06;
     const cos = Math.cos(jitter);
     const sin = Math.sin(jitter);
     const vx = ball.vx * cos - ball.vy * sin;
@@ -318,21 +382,21 @@ const regulate = (state: EngineState, ball: Ball, dt: number) => {
     const s = speedOf(ball);
     const minVy = s * MIN_VY_FRACTION;
     if (Math.abs(ball.vy) < minVy) {
-        const sign = ball.vy === 0 ? (Math.random() > 0.5 ? 1 : -1) : Math.sign(ball.vy);
+        const sign = ball.vy === 0 ? (state.rng() > 0.5 ? 1 : -1) : Math.sign(ball.vy);
         ball.vy = sign * (Math.abs(ball.vy) + (minVy - Math.abs(ball.vy)) * Math.min(1, 6 * dt));
     }
     const minVx = s * MIN_VX_FRACTION;
     if (Math.abs(ball.vx) < minVx) {
-        const sign = ball.vx === 0 ? (Math.random() > 0.5 ? 1 : -1) : Math.sign(ball.vx);
+        const sign = ball.vx === 0 ? (state.rng() > 0.5 ? 1 : -1) : Math.sign(ball.vx);
         ball.vx = sign * (Math.abs(ball.vx) + (minVx - Math.abs(ball.vx)) * Math.min(1, 6 * dt));
     }
 
     // Gentle drift keeps long rallies organic.
-    ball.vx += (Math.random() - 0.5) * JITTER * dt;
-    ball.vy += (Math.random() - 0.5) * JITTER * dt * 0.5;
+    ball.vx += (state.rng() - 0.5) * JITTER * dt;
+    ball.vy += (state.rng() - 0.5) * JITTER * dt * 0.5;
 };
 
-const step = (state: EngineState, dt: number, trailTick: boolean) => {
+const step = (state: EngineState, dt: number) => {
     if (state.ambient) {
         updateAITarget(state, state.ai, AI_LINE, true, dt);
         updateAITarget(state, state.player, PLAYER_LINE, false, dt);
@@ -351,9 +415,11 @@ const step = (state: EngineState, dt: number, trailTick: boolean) => {
         collideWalls(state, ball);
         regulate(state, ball, dt);
 
-        if (trailTick) {
+        // Distance-based trail: a clean comet at any speed, never a clump.
+        const last = ball.trail[ball.trail.length - 1];
+        if (!last || Math.hypot(ball.x - last.x, ball.y - last.y) > 7) {
             ball.trail.push({ x: ball.x, y: ball.y });
-            if (ball.trail.length > 10) ball.trail.shift();
+            if (ball.trail.length > 12) ball.trail.shift();
         }
     }
 
@@ -369,16 +435,20 @@ const step = (state: EngineState, dt: number, trailTick: boolean) => {
     }
 };
 
-let stepCounter = 0;
-
 /**
- * Advance the simulation by real elapsed seconds. Catches up in fixed steps;
- * hit-stop pauses physics (never the visuals) for a few milliseconds of weight.
+ * Advance the simulation by real elapsed seconds.
+ *
+ * Time flows through three gates before reaching the physics:
+ *   1. Hit-stop freezes the world for a few milliseconds of impact weight.
+ *   2. The start/resume ramp eases play in from slow motion (RAMP_FLOOR → 1).
+ *   3. A persistent accumulator converts what remains into fixed SIM_STEPs,
+ *      carrying the remainder across frames so the game runs at exactly the
+ *      same pace on a 60 Hz laptop and a 144 Hz monitor.
+ * Visual decays (squash, stretch) ride on real time, even during hit-stop.
  */
 export const advance = (state: EngineState, elapsed: number) => {
     if (state.status === 'over') return;
 
-    // Visual decays run on real time, even during hit-stop.
     const decay = Math.exp(-elapsed / 0.09);
     state.player.stretch *= decay;
     state.ai.stretch *= decay;
@@ -390,10 +460,15 @@ export const advance = (state: EngineState, elapsed: number) => {
         state.hitStop -= frozen;
         budget -= frozen;
     }
-    while (budget >= SIM_STEP) {
-        stepCounter = (stepCounter + 1) % 4;
-        step(state, SIM_STEP, stepCounter === 0);
-        budget -= SIM_STEP;
+
+    const rampProgress = Math.min(state.ramp / RAMP_DURATION, 1);
+    const timescale = RAMP_FLOOR + (1 - RAMP_FLOOR) * rampProgress;
+    state.ramp += elapsed;
+
+    state.acc += budget * timescale;
+    while (state.acc >= SIM_STEP) {
+        step(state, SIM_STEP);
+        state.acc -= SIM_STEP;
         if (state.winner !== null) break;
     }
 };

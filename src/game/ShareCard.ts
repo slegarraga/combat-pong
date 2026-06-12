@@ -5,6 +5,7 @@
  */
 
 import { GRID, COLORS, MODES } from './constants';
+import { getDailyRecord } from './daily';
 import type { MatchResult } from './types';
 
 const CARD = 1080;
@@ -80,10 +81,11 @@ export const generateShareCard = async (result: MatchResult): Promise<Blob> => {
     ctx.font = font(120, 700);
     ctx.fillText(`${result.dayShare}%`, CARD / 2, by + boardSize + 226);
 
+    const label = result.daily !== undefined ? `Daily Duel #${result.daily}` : MODES[result.mode].label;
     ctx.fillStyle = 'rgba(244, 240, 232, 0.45)';
     ctx.font = font(30, 500);
     ctx.fillText(
-        `${MODES[result.mode].label} · best streak ×${result.bestStreak} · combatpong.com`,
+        `${label} · best streak ×${result.bestStreak} · combatpong.com`,
         CARD / 2,
         by + boardSize + 286,
     );
@@ -93,32 +95,91 @@ export const generateShareCard = async (result: MatchResult): Promise<Blob> => {
     });
 };
 
-export const shareResult = async (result: MatchResult): Promise<'shared' | 'downloaded'> => {
-    const blob = await generateShareCard(result);
-    const text = result.won
-        ? `I took ${result.dayShare}% of the board in Combat Pong.`
-        : `The board got away from me this time: ${result.dayShare}% in Combat Pong.`;
-    const url = 'https://www.combatpong.com';
-
-    const file = new File([blob], 'combat-pong.png', { type: 'image/png' });
-    if (navigator.canShare?.({ files: [file] })) {
-        try {
-            await navigator.share({ files: [file], text, url });
-            return 'shared';
-        } catch {
-            // user dismissed the sheet — fall through to download
+/**
+ * The final board as an 8x8 emoji mosaic — the Wordle trick, in our shape.
+ * It pastes as plain text into any chat, renders everywhere, spoils nothing,
+ * and no two players ever produce the same frontier.
+ */
+export const boardEmojiGrid = (grid: Uint8Array): string => {
+    const block = GRID / 8; // 3x3 tiles per emoji cell, majority wins
+    const rows: string[] = [];
+    for (let by = 0; by < 8; by++) {
+        let row = '';
+        for (let bx = 0; bx < 8; bx++) {
+            let day = 0;
+            for (let y = 0; y < block; y++) {
+                for (let x = 0; x < block; x++) {
+                    if (grid[(by * block + y) * GRID + (bx * block + x)] === 0) day++;
+                }
+            }
+            row += day * 2 > block * block ? '🟨' : '⬛';
         }
+        rows.push(row);
     }
+    return rows.join('\n');
+};
 
+/** The brag line: always ends in a challenge, because challenges get clicked. */
+export const shareText = (result: MatchResult) => {
+    if (result.daily !== undefined) {
+        const streak = getDailyRecord(result.daily)?.streakDays ?? 1;
+        const streakNote = streak >= 2 ? ` · ${streak}-day streak` : '';
+        return `Combat Pong Daily #${result.daily} · ${result.dayShare}%${streakNote}\n\n${boardEmojiGrid(result.grid)}\n\nYour move: ${DAILY_URL}`;
+    }
+    return result.won
+        ? `I took ${result.dayShare}% of the board in Combat Pong. Can you hold more? ${SHARE_URL}`
+        : `The night held me to ${result.dayShare}% in Combat Pong. Can you do better? ${SHARE_URL}`;
+};
+
+const SHARE_URL = 'https://www.combatpong.com';
+const DAILY_URL = 'https://www.combatpong.com/daily';
+
+/** Whether the OS share sheet exists at all (mostly mobile and Safari). */
+export const canNativeShare = () => typeof navigator.share === 'function';
+
+/** Whether PNG-to-clipboard is available (Chromium and modern Safari). */
+export const canCopyImage = () =>
+    typeof window.ClipboardItem === 'function' && typeof navigator.clipboard?.write === 'function';
+
+/** Open the OS share sheet with the card attached. False = dismissed/unavailable. */
+export const nativeShareCard = async (result: MatchResult, blob: Blob): Promise<boolean> => {
+    const file = new File([blob], 'combat-pong.png', { type: 'image/png' });
+    if (!navigator.canShare?.({ files: [file] })) return false;
+    try {
+        // The text already carries its link; passing `url` too would double it.
+        await navigator.share({ files: [file], text: shareText(result) });
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+/** Copy the full share text (Daily Duels include the emoji board). */
+export const copyShareText = async (result: MatchResult): Promise<boolean> => {
+    try {
+        await navigator.clipboard.writeText(shareText(result));
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+/** Put the card PNG on the clipboard, ready to paste anywhere. */
+export const copyCardImage = async (blob: Blob): Promise<boolean> => {
+    if (!canCopyImage()) return false;
+    try {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+/** Save the card as a file. */
+export const downloadCard = (blob: Blob) => {
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = 'combat-pong.png';
     link.click();
     URL.revokeObjectURL(link.href);
-    try {
-        await navigator.clipboard.writeText(`${text} ${url}`);
-    } catch {
-        // clipboard unavailable — the download alone is fine
-    }
-    return 'downloaded';
 };

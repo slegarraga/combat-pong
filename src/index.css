@@ -211,6 +211,20 @@ button:focus-visible {
     font-weight: 700;
 }
 
+.daily-link {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--day);
+    padding: 8px 18px;
+    border-radius: 999px;
+    transition: background 0.2s ease;
+}
+
+.daily-link:hover {
+    background: rgba(233, 201, 136, 0.08);
+}
+
 .home-foot {
     display: flex;
     align-items: center;
@@ -413,6 +427,40 @@ button:focus-visible {
     }
 }
 
+/* The result holds a beat before the verdict fades in: let the final
+   frontier land first, then talk. */
+.overlay-delayed {
+    animation: overlay-in 0.45s cubic-bezier(0.25, 1, 0.4, 1) 0.75s both;
+}
+
+.overlay-eyebrow {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--day);
+}
+
+.result-card {
+    width: clamp(96px, 18vh, 150px);
+    border-radius: 10px;
+    overflow: hidden;
+    line-height: 0;
+    box-shadow: 0 12px 36px -12px rgba(0, 0, 0, 0.8);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.result-card img {
+    width: 100%;
+    display: block;
+}
+
+.result-card:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 16px 44px -12px rgba(0, 0, 0, 0.9);
+}
+
 .overlay-title {
     font-family: var(--font-display);
     font-size: 24px;
@@ -444,6 +492,39 @@ button:focus-visible {
     display: flex;
     gap: 10px;
     margin-top: 8px;
+}
+
+/* ---------- share lightbox ---------- */
+
+.lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 24px;
+    background: rgba(10, 11, 14, 0.88);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    animation: overlay-in 0.25s ease;
+    cursor: default;
+}
+
+.lightbox-img {
+    width: min(82vw, 58vh, 520px);
+    border-radius: 20px;
+    box-shadow: 0 32px 90px -24px rgba(0, 0, 0, 0.9);
+    animation: card-pop 0.35s cubic-bezier(0.25, 1, 0.4, 1);
+}
+
+@keyframes card-pop {
+    from {
+        opacity: 0;
+        transform: scale(0.92);
+    }
 }
 
 /* ---------- static pages ---------- */
@@ -515,6 +596,26 @@ button:focus-visible {
 
     .overlay-share {
         font-size: 48px;
+    }
+}
+
+/* Compact end screen: on small boards the card preview shrinks so the
+   whole result still breathes inside the overlay. */
+@media (max-width: 480px), (max-height: 760px) {
+    .overlay {
+        gap: 9px;
+    }
+
+    .result-card {
+        width: clamp(72px, 12vh, 104px);
+    }
+
+    .overlay-title {
+        font-size: 20px;
+    }
+
+    .overlay-meta {
+        font-size: 12px;
     }
 }
 

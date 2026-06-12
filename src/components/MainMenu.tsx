@@ -9,18 +9,38 @@ import { advance, createEngine } from '../game/engine';
 import { createRenderer } from '../game/render';
 import { getStats } from '../game/PlayerStats';
 import { getSavedMode, saveMode } from '../game/modePref';
+import { dailyNumber, getDailyRecord, getLatestDailyRecord } from '../game/daily';
 import { isSoundEnabled, setSoundEnabled, unlockAudio } from '../game/audio';
 
 interface MainMenuProps {
     onPlay: (mode: ModeId) => void;
+    onDaily: () => void;
     onHowTo: () => void;
 }
 
-const MainMenu = ({ onPlay, onHowTo }: MainMenuProps) => {
+/**
+ * The daily link doubles as the retention hook: done = today's score,
+ * streak at risk = a nudge to keep it, otherwise a simple invitation.
+ */
+const dailyLabel = (today: number, done: ReturnType<typeof getDailyRecord>) => {
+    if (done) {
+        const streak = done.streakDays >= 2 ? ` · ${done.streakDays}d streak` : '';
+        return `Daily Duel #${today}: ${done.share}%${streak} · replay`;
+    }
+    const latest = getLatestDailyRecord();
+    if (latest && latest.n === today - 1 && latest.streakDays >= 2) {
+        return `Daily Duel #${today} → keep your ${latest.streakDays}d streak`;
+    }
+    return `Daily Duel #${today} →`;
+};
+
+const MainMenu = ({ onPlay, onDaily, onHowTo }: MainMenuProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [mode, setMode] = useState<ModeId>(getSavedMode);
     const [soundOn, setSoundOn] = useState(isSoundEnabled);
     const stats = useRef(getStats());
+    const today = useRef(dailyNumber());
+    const dailyDone = useRef(getDailyRecord(today.current));
 
     const chooseMode = (next: ModeId) => {
         setMode(next);
@@ -109,6 +129,16 @@ const MainMenu = ({ onPlay, onHowTo }: MainMenuProps) => {
                         </button>
                     ))}
                 </div>
+
+                <button
+                    className="daily-link"
+                    onClick={() => {
+                        unlockAudio();
+                        onDaily();
+                    }}
+                >
+                    {dailyLabel(today.current, dailyDone.current)}
+                </button>
             </div>
 
             <footer className="home-foot">

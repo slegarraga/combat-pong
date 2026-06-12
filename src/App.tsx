@@ -8,13 +8,15 @@ import { useCallback, useEffect, useState } from 'react';
 import MainMenu from './components/MainMenu';
 import HowToPlay from './components/HowToPlay';
 import { getSavedMode } from './game/modePref';
+import { dailyNumber } from './game/daily';
 import GameCanvas from './game/GameCanvas';
 import type { ModeId } from './game/constants';
 
-type Route = 'home' | 'play' | 'how-to-play';
+type Route = 'home' | 'play' | 'daily' | 'how-to-play';
 
 const routeFromPath = (pathname: string): Route => {
     if (pathname === '/play') return 'play';
+    if (pathname === '/daily') return 'daily';
     if (pathname === '/how-to-play') return 'how-to-play';
     return 'home';
 };
@@ -22,6 +24,7 @@ const routeFromPath = (pathname: string): Route => {
 const TITLES: Record<Route, string> = {
     home: 'Combat Pong · a 90-second duel for territory',
     play: 'Combat Pong · playing',
+    daily: 'Daily Duel · Combat Pong',
     'how-to-play': 'How to play · Combat Pong',
 };
 
@@ -49,6 +52,10 @@ const App = () => {
         return <GameCanvas mode={mode} onHome={() => navigate('/')} />;
     }
 
+    if (route === 'daily') {
+        return <GameCanvas mode="classic" daily={dailyNumber()} onHome={() => navigate('/')} />;
+    }
+
     if (route === 'how-to-play') {
         return <HowToPlay onPlay={() => navigate('/play')} onHome={() => navigate('/')} />;
     }
@@ -59,6 +66,7 @@ const App = () => {
                 setMode(selected);
                 navigate('/play');
             }}
+            onDaily={() => navigate('/daily')}
             onHowTo={() => navigate('/how-to-play')}
         />
     );
