@@ -13,16 +13,26 @@ Inspired by [Pong Wars](https://github.com/vnglst/pong-wars), with a paddle in y
 - Every clean return builds a streak that adds speed (and climbs the musical scale). A ball slipping past you only resets the streak — territory is the only score, so a miss never feels like death.
 - After 90 seconds, whoever holds more tiles takes the duel.
 
-Four modes — Calm, Classic, Quick, Chaos — change the number of balls, the tempo, and how sharp the night plays.
+Four modes (Calm, Classic, Quick, Chaos) change the number of balls, the tempo, and how sharp the night plays. The **Daily Duel** serves the same seeded board to everyone in the world each UTC day; only your first attempt counts, day streaks add up, and your result shares as an emoji mosaic of your actual final frontier:
+
+```text
+Combat Pong Daily #5 · 63% · 3-day streak
+
+⬛⬛⬛⬛⬛⬛⬛⬛
+⬛⬛⬛🟨🟨🟨🟨⬛
+🟨🟨🟨🟨🟨🟨🟨🟨
+...
+```
 
 ## Design
 
 The whole game is tuned to be **satisfying and relaxing at once**:
 
 - Two continuous masses of territory, no grid lines, an organic frontier with dawn light bleeding into the night.
-- A fixed-timestep simulation (240 Hz), so the physics feel identical on every display.
-- Squash-and-stretch, 28 ms hit-stop, soft trails and capture blooms — feel lives in the simulation, not in screen shake.
-- A generative soundscape on the D major pentatonic scale: captures are wind chimes, returns are warm plucks. Any sequence is musical by construction.
+- A fixed-timestep simulation (240 Hz) on a persistent accumulator, so the physics run at exactly the same pace on a 60 Hz laptop and a 144 Hz monitor.
+- Squash-and-stretch on every bounce axis, speed-scaled hit-stop, slam returns, slow-motion starts, soft trails and capture blooms. Feel lives in the simulation, not in screen shake.
+- On desktop, clicking the board captures your mouse (Pointer Lock), so the cursor can never leave the duel; Esc releases it and pauses.
+- A generative soundscape on the D major pentatonic scale, panned in stereo by board column: captures are wind chimes, cascades become arpeggios, returns are warm plucks, and the last ten seconds sit on a quiet pad.
 
 ## Tech
 
@@ -47,10 +57,12 @@ src/
 └── game/
     ├── engine.ts           # Pure simulation: physics, AI, streaks, events
     ├── render.ts           # Canvas renderer: territory, trails, blooms
-    ├── audio.ts            # Generative pentatonic soundscape
+    ├── audio.ts            # Generative pentatonic soundscape, stereo-panned
     ├── GameCanvas.tsx      # Match screen: rAF loop, input, HUD, overlays
     ├── ShareCard.ts        # Result cards drawn from your actual final board
+    ├── daily.ts            # The Daily Duel: one shared seeded board per day
     ├── PlayerStats.ts      # Local career stats
+    ├── modePref.ts         # Persisted mode selection
     ├── constants.ts        # The tuning surface
     └── types.ts            # Engine types
 ```
